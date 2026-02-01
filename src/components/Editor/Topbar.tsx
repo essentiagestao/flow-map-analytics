@@ -28,9 +28,10 @@ interface TopbarProps {
   onZoomOut?: () => void;
   onFitView?: () => void;
   onOpenShortcuts?: () => void;
+  onOpenExport?: () => void;
 }
 
-export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts }: TopbarProps) => {
+export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpenExport }: TopbarProps) => {
   const { 
     clear, 
     saveToLocal, 
@@ -160,11 +161,11 @@ export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts }: Topb
         <Button 
           variant="outline" 
           size="sm" 
-          onClick={handleExportImage}
-          title="Exportar Imagem"
+          onClick={onOpenExport}
+          title="Exportar Imagem/PDF"
         >
           <Image className="w-4 h-4" />
-          Exportar Imagem
+          Exportar
         </Button>
         
         <div className="w-px h-6 bg-border mx-2" />

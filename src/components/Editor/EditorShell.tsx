@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import { useNodeAlignment } from '@/hooks/useNodeAlignment';
 import { KeyboardShortcutsDialog } from './KeyboardShortcutsDialog';
 import { DeleteConfirmDialog, shouldShowDeleteConfirm } from './DeleteConfirmDialog';
+import { OnboardingOverlay } from './Onboarding/OnboardingOverlay';
+import { ExportDialog } from './Export/ExportDialog';
 
 export const EditorShell = () => {
   const { 
@@ -38,6 +40,7 @@ export const EditorShell = () => {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeleteCount, setPendingDeleteCount] = useState(0);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -176,7 +179,10 @@ export const EditorShell = () => {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      <Topbar onOpenShortcuts={() => setShortcutsOpen(true)} />
+      <Topbar 
+        onOpenShortcuts={() => setShortcutsOpen(true)} 
+        onOpenExport={() => setExportDialogOpen(true)}
+      />
       
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar esquerda - Paleta */}
@@ -207,6 +213,14 @@ export const EditorShell = () => {
         count={pendingDeleteCount}
         onConfirm={executeDelete}
       />
+      
+      <ExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+      />
+      
+      {/* Onboarding for first-time users */}
+      <OnboardingOverlay />
     </div>
   );
 };
