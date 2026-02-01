@@ -16,6 +16,7 @@ import {
   NodeChange,
   OnSelectionChangeParams,
   BackgroundVariant,
+  applyNodeChanges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -46,6 +47,11 @@ const categoryToNodeType: Record<NodeCategory, keyof typeof nodeTypes> = {
 
 const CanvasComponent = () => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  // Track drag state to prevent store from overwriting local positions during drag
+  const isDraggingRef = useRef(false);
+  // Track last store sync to prevent loops
+  const lastStoreSyncRef = useRef<string>('');
+  
   const { 
     nodes: storeNodes, 
     edges: storeEdges, 
@@ -55,39 +61,99 @@ const CanvasComponent = () => {
     setSelectedNodeIds,
     selectedNodeId,
     selectedNodeIds,
-    setNodes,
-    setEdges,
+    setNodes: setStoreNodes,
+    setEdges: setStoreEdges,
     updateNode,
+    pushHistory,
   } = useFunnelStore();
   
-  const [nodes, setLocalNodes, onNodesChange] = useNodesState([]);
-  const [edges, setLocalEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { screenToFlowPosition, fitView, zoomIn, zoomOut } = useReactFlow();
 
-  // Sync store changes to local state and apply selection
-  useEffect(() => {
-    const nodesWithSelection = storeNodes.map(node => ({
-      ...node,
-      selected: selectedNodeIds.includes(node.id) || selectedNodeId === node.id,
-    }));
-    setLocalNodes(nodesWithSelection);
-  }, [storeNodes, selectedNodeId, selectedNodeIds, setLocalNodes]);
+  /**
+   * SYNC STRATEGY:
+   * - Store is the source of truth for node DATA (label, nodeType, url, etc.)
+   * - React Flow is the source of truth for node POSITION during drag
+   * - On drag end, positions sync back to store
+   * - Selection state is derived from store's selectedNodeId/selectedNodeIds
+   */
 
+  // Sync store nodes to React Flow local state
+  // Key: preserve React Flow's internal metadata and positions during drag
   useEffect(() => {
-    setLocalEdges(storeEdges);
-  }, [storeEdges, setLocalEdges]);
+    const storeKey = JSON.stringify(storeNodes.map(n => n.id).sort());
+    
+    setNodes(currentLocalNodes => {
+      // Create a map of current local nodes for quick lookup
+      const localNodeMap = new Map(currentLocalNodes.map(n => [n.id, n]));
+      const storeNodeIds = new Set(storeNodes.map(n => n.id));
+      
+      // Build the new nodes array
+      const newNodes: Node[] = [];
+      
+      for (const storeNode of storeNodes) {
+        const localNode = localNodeMap.get(storeNode.id);
+        const isSelected = selectedNodeIds.includes(storeNode.id) || selectedNodeId === storeNode.id;
+        
+        if (localNode) {
+          // Node exists locally - preserve React Flow's internal state and position during drag
+          newNodes.push({
+            ...localNode,
+            // Always update data from store
+            data: storeNode.data,
+            type: storeNode.type,
+            // Update position only if NOT dragging
+            position: isDraggingRef.current ? localNode.position : storeNode.position,
+            // Update selection
+            selected: isSelected,
+          });
+        } else {
+          // New node from store - add it fresh
+          newNodes.push({
+            ...storeNode,
+            selected: isSelected,
+          });
+        }
+      }
+      
+      // Check if anything changed
+      if (newNodes.length === currentLocalNodes.length) {
+        const hasChanges = newNodes.some((newNode, i) => {
+          const oldNode = currentLocalNodes.find(n => n.id === newNode.id);
+          if (!oldNode) return true;
+          return (
+            oldNode.selected !== newNode.selected ||
+            (!isDraggingRef.current && (
+              oldNode.position.x !== newNode.position.x ||
+              oldNode.position.y !== newNode.position.y
+            )) ||
+            JSON.stringify(oldNode.data) !== JSON.stringify(newNode.data)
+          );
+        });
+        if (!hasChanges) return currentLocalNodes;
+      }
+      
+      return newNodes;
+    });
+  }, [storeNodes, selectedNodeId, selectedNodeIds, setNodes]);
 
-  // Custom onNodesChange to handle resize and selection properly
+  // Sync edges from store
+  useEffect(() => {
+    setEdges(storeEdges);
+  }, [storeEdges, setEdges]);
+
+  // Handle all node changes from React Flow (position, dimensions, add, remove, select)
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
-    // Filter out selection changes - we handle selection ourselves
+    // Filter out selection changes - we handle selection through our store
     const nonSelectionChanges = changes.filter(change => change.type !== 'select');
     
-    // Apply non-selection changes locally
+    // Apply changes to local React Flow state
     if (nonSelectionChanges.length > 0) {
       onNodesChange(nonSelectionChanges);
     }
     
-    // Handle dimension changes (resize)
+    // Sync dimension changes (resize) to store immediately
     changes.forEach((change) => {
       if (change.type === 'dimensions' && change.dimensions) {
         const node = nodes.find(n => n.id === change.id);
@@ -104,27 +170,48 @@ const CanvasComponent = () => {
     });
   }, [onNodesChange, nodes, updateNode]);
 
-  // Sync local changes to store (position changes)
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      // Only sync position changes, not selection
-      const storeNodesPositions = storeNodes.map(n => ({ id: n.id, position: n.position }));
-      const localNodesPositions = nodes.map(n => ({ id: n.id, position: n.position }));
-      
-      if (JSON.stringify(storeNodesPositions) !== JSON.stringify(localNodesPositions)) {
-        const updatedNodes = nodes.map(n => {
-          const { selected, ...rest } = n as any;
-          return rest;
-        });
-        setNodes(updatedNodes);
-      }
-    }, 100);
-    return () => clearTimeout(timeout);
-  }, [nodes, storeNodes, setNodes]);
+  // Called when node drag STARTS
+  const onNodeDragStart = useCallback(() => {
+    isDraggingRef.current = true;
+  }, []);
 
+  // Called when node drag ENDS - sync positions to store
+  const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node, draggedNodes: Node[]) => {
+    // Get all dragged nodes (supports multi-select drag)
+    const nodesToSync = draggedNodes.length > 0 ? draggedNodes : [node];
+    
+    // Update store with final positions
+    const updatedStoreNodes = storeNodes.map(storeNode => {
+      const draggedNode = nodesToSync.find(n => n.id === storeNode.id);
+      if (draggedNode) {
+        return {
+          ...storeNode,
+          position: { x: draggedNode.position.x, y: draggedNode.position.y },
+        };
+      }
+      return storeNode;
+    });
+    
+    // Sync to store
+    setStoreNodes(updatedStoreNodes);
+    pushHistory();
+    
+    // Reset drag flag after a small delay to ensure store sync completes
+    requestAnimationFrame(() => {
+      isDraggingRef.current = false;
+    });
+  }, [storeNodes, setStoreNodes, pushHistory]);
+
+  // Sync edge changes to store
   useEffect(() => {
-    setEdges(edges);
-  }, [edges, setEdges]);
+    const storeEdgeIds = storeEdges.map(e => e.id).sort().join(',');
+    const localEdgeIds = edges.map(e => e.id).sort().join(',');
+    
+    if (localEdgeIds !== storeEdgeIds && localEdgeIds !== lastStoreSyncRef.current) {
+      lastStoreSyncRef.current = localEdgeIds;
+      setStoreEdges(edges);
+    }
+  }, [edges, storeEdges, setStoreEdges]);
 
   const onConnect = useCallback((params: Connection) => {
     const newEdge: Edge = {
@@ -146,6 +233,7 @@ const CanvasComponent = () => {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
+  // Handle drop from palette (new nodes)
   const onDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
 
@@ -157,9 +245,10 @@ const CanvasComponent = () => {
       return;
     }
 
+    // Calculate position accounting for canvas offset and zoom
     const position = screenToFlowPosition({
-      x: event.clientX - reactFlowBounds.left,
-      y: event.clientY - reactFlowBounds.top,
+      x: event.clientX,
+      y: event.clientY,
     });
 
     const config = getNodeConfig(nodeType);
@@ -188,6 +277,7 @@ const CanvasComponent = () => {
       },
     };
 
+    // Add to store - will sync to local state via useEffect
     addNode(newNode);
     // Select the newly added node
     setSelectedNodeId(newNode.id);
@@ -202,17 +292,17 @@ const CanvasComponent = () => {
     setSelectedNodeIds([]);
   }, [setSelectedNodeId, setSelectedNodeIds]);
 
-  // Handle selection change for multi-select (box selection)
+  // Handle multi-select (box selection)
   const onSelectionChange = useCallback(({ nodes: selectedNodes }: OnSelectionChangeParams) => {
     if (selectedNodes.length > 1) {
       setSelectedNodeIds(selectedNodes.map(n => n.id));
     } else if (selectedNodes.length === 1) {
       setSelectedNodeId(selectedNodes[0].id);
     }
-    // Don't clear selection here - let onPaneClick handle that
+    // Don't clear selection here - onPaneClick handles that
   }, [setSelectedNodeId, setSelectedNodeIds]);
 
-  // Expose zoom functions to parent via global
+  // Expose zoom functions globally
   useEffect(() => {
     (window as any).reactFlowZoomIn = zoomIn;
     (window as any).reactFlowZoomOut = zoomOut;
@@ -234,6 +324,8 @@ const CanvasComponent = () => {
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
         onSelectionChange={onSelectionChange}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         fitView
         snapToGrid
