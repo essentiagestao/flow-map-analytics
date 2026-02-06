@@ -12,6 +12,7 @@ import {
   Redo2,
   RotateCw,
   Keyboard,
+  LayoutTemplate,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,9 +30,10 @@ interface TopbarProps {
   onFitView?: () => void;
   onOpenShortcuts?: () => void;
   onOpenExport?: () => void;
+  onOpenTemplates?: () => void;
 }
 
-export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpenExport }: TopbarProps) => {
+export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpenExport, onOpenTemplates }: TopbarProps) => {
   const { 
     clear, 
     saveToLocal, 
@@ -151,14 +153,14 @@ export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpen
         <Button 
           variant="outline" 
           size="sm" 
-          onClick={handleLoadSample}
-          title="Carregar exemplo"
+          onClick={onOpenTemplates}
+          title="Templates prontos"
         >
-          <FolderOpen className="w-4 h-4" />
-          Exemplo
+          <LayoutTemplate className="w-4 h-4" />
+          Templates
         </Button>
         
-        <Button 
+        <Button
           variant="outline" 
           size="sm" 
           onClick={onOpenExport}
