@@ -13,6 +13,7 @@ import { KeyboardShortcutsDialog } from './KeyboardShortcutsDialog';
 import { DeleteConfirmDialog, shouldShowDeleteConfirm } from './DeleteConfirmDialog';
 import { OnboardingOverlay } from './Onboarding/OnboardingOverlay';
 import { ExportDialog } from './Export/ExportDialog';
+import { TemplateSelector } from './TemplateSelector';
 
 export const EditorShell = () => {
   const { 
@@ -41,6 +42,7 @@ export const EditorShell = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeleteCount, setPendingDeleteCount] = useState(0);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -182,6 +184,7 @@ export const EditorShell = () => {
       <Topbar 
         onOpenShortcuts={() => setShortcutsOpen(true)} 
         onOpenExport={() => setExportDialogOpen(true)}
+        onOpenTemplates={() => setTemplatesOpen(true)}
       />
       
       <div className="flex-1 flex overflow-hidden">
@@ -217,6 +220,11 @@ export const EditorShell = () => {
       <ExportDialog
         open={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
+      />
+      
+      <TemplateSelector
+        open={templatesOpen}
+        onOpenChange={setTemplatesOpen}
       />
       
       {/* Onboarding for first-time users */}
