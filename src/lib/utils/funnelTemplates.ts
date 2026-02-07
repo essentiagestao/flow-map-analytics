@@ -1,4 +1,5 @@
 import { Node, Edge } from '@xyflow/react';
+import { getDefaultMetrics } from './defaultMetrics';
 
 export interface FunnelTemplate {
   id: string;
@@ -26,6 +27,7 @@ const instagramToCRM: FunnelTemplate = {
         url: '',
         width: 64,
         height: 64,
+        ...getDefaultMetrics('instagram', 'traffic'),
       },
     },
     {
@@ -38,6 +40,7 @@ const instagramToCRM: FunnelTemplate = {
         url: '/lp-instagram',
         width: 160,
         height: 140,
+        ...getDefaultMetrics('landing', 'page'),
       },
     },
     {
@@ -50,6 +53,7 @@ const instagramToCRM: FunnelTemplate = {
         url: '',
         width: 56,
         height: 56,
+        ...getDefaultMetrics('lead', 'event'),
       },
     },
     {
@@ -62,6 +66,7 @@ const instagramToCRM: FunnelTemplate = {
         url: '',
         width: 56,
         height: 56,
+        ...getDefaultMetrics('sequence', 'communication'),
       },
     },
     {
@@ -74,6 +79,7 @@ const instagramToCRM: FunnelTemplate = {
         url: '',
         width: 56,
         height: 56,
+        ...getDefaultMetrics('customer', 'event'),
       },
     },
   ],
@@ -102,6 +108,7 @@ const simpleFunnel: FunnelTemplate = {
         url: '',
         width: 64,
         height: 64,
+        ...getDefaultMetrics('facebook', 'traffic'),
       },
     },
     {
@@ -114,6 +121,7 @@ const simpleFunnel: FunnelTemplate = {
         url: '/lp-oferta',
         width: 160,
         height: 140,
+        ...getDefaultMetrics('landing', 'page'),
       },
     },
     {
@@ -126,6 +134,7 @@ const simpleFunnel: FunnelTemplate = {
         url: '/obrigado',
         width: 160,
         height: 140,
+        ...getDefaultMetrics('thankyou', 'page'),
       },
     },
   ],
@@ -152,6 +161,7 @@ const upsellFunnel: FunnelTemplate = {
         url: '',
         width: 64,
         height: 64,
+        ...getDefaultMetrics('google', 'traffic'),
       },
     },
     {
@@ -164,6 +174,7 @@ const upsellFunnel: FunnelTemplate = {
         url: '/vendas',
         width: 160,
         height: 140,
+        ...getDefaultMetrics('sales', 'page'),
       },
     },
     {
@@ -176,6 +187,7 @@ const upsellFunnel: FunnelTemplate = {
         url: '/checkout',
         width: 160,
         height: 140,
+        ...getDefaultMetrics('checkout', 'page'),
       },
     },
     {
@@ -184,10 +196,12 @@ const upsellFunnel: FunnelTemplate = {
       position: { x: 800, y: 100 },
       data: { 
         label: 'Upsell',
-        nodeType: 'upsell',
+        nodeType: 'sales',
         url: '/upsell',
         width: 160,
         height: 140,
+        conversionRate: 25,
+        cost: 0,
       },
     },
     {
@@ -196,10 +210,12 @@ const upsellFunnel: FunnelTemplate = {
       position: { x: 800, y: 320 },
       data: { 
         label: 'Downsell',
-        nodeType: 'downsell',
+        nodeType: 'sales',
         url: '/downsell',
         width: 160,
         height: 140,
+        conversionRate: 35,
+        cost: 0,
       },
     },
     {
@@ -212,6 +228,7 @@ const upsellFunnel: FunnelTemplate = {
         url: '/obrigado',
         width: 160,
         height: 140,
+        ...getDefaultMetrics('thankyou', 'page'),
       },
     },
   ],
@@ -242,6 +259,7 @@ const webinarFunnel: FunnelTemplate = {
         url: '',
         width: 64,
         height: 64,
+        ...getDefaultMetrics('youtube', 'traffic'),
       },
     },
     {
@@ -254,6 +272,7 @@ const webinarFunnel: FunnelTemplate = {
         url: '/webinar-registro',
         width: 160,
         height: 140,
+        ...getDefaultMetrics('webinar', 'page'),
       },
     },
     {
@@ -266,6 +285,7 @@ const webinarFunnel: FunnelTemplate = {
         url: '',
         width: 56,
         height: 56,
+        ...getDefaultMetrics('sequence', 'communication'),
       },
     },
     {
@@ -278,6 +298,8 @@ const webinarFunnel: FunnelTemplate = {
         url: '/webinar-sala',
         width: 160,
         height: 140,
+        conversionRate: 60,
+        cost: 0,
       },
     },
     {
@@ -290,6 +312,7 @@ const webinarFunnel: FunnelTemplate = {
         url: '/checkout',
         width: 160,
         height: 140,
+        ...getDefaultMetrics('checkout', 'page'),
       },
     },
     {
@@ -302,6 +325,7 @@ const webinarFunnel: FunnelTemplate = {
         url: '',
         width: 56,
         height: 56,
+        ...getDefaultMetrics('customer', 'event'),
       },
     },
   ],
@@ -331,6 +355,7 @@ const leadNurturing: FunnelTemplate = {
         url: '',
         width: 64,
         height: 64,
+        ...getDefaultMetrics('organic', 'traffic'),
       },
     },
     {
@@ -343,6 +368,7 @@ const leadNurturing: FunnelTemplate = {
         url: '/blog/artigo',
         width: 160,
         height: 140,
+        ...getDefaultMetrics('blog', 'page'),
       },
     },
     {
@@ -355,6 +381,7 @@ const leadNurturing: FunnelTemplate = {
         url: '/ebook',
         width: 160,
         height: 140,
+        ...getDefaultMetrics('landing', 'page'),
       },
     },
     {
@@ -367,6 +394,7 @@ const leadNurturing: FunnelTemplate = {
         url: '',
         width: 56,
         height: 56,
+        ...getDefaultMetrics('lead', 'event'),
       },
     },
     {
@@ -379,6 +407,7 @@ const leadNurturing: FunnelTemplate = {
         url: '',
         width: 56,
         height: 56,
+        ...getDefaultMetrics('sequence', 'communication'),
       },
     },
     {
@@ -391,6 +420,7 @@ const leadNurturing: FunnelTemplate = {
         url: '',
         width: 56,
         height: 56,
+        ...getDefaultMetrics('segment', 'event'),
       },
     },
     {
@@ -403,6 +433,7 @@ const leadNurturing: FunnelTemplate = {
         url: '/vendas',
         width: 160,
         height: 140,
+        ...getDefaultMetrics('sales', 'page'),
       },
     },
     {
@@ -415,6 +446,7 @@ const leadNurturing: FunnelTemplate = {
         url: '',
         width: 56,
         height: 56,
+        ...getDefaultMetrics('customer', 'event'),
       },
     },
   ],

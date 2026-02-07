@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Users, Target, DollarSign, Percent, BarChart3 } from 'lucide-react';
+import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Users, Target, DollarSign, Percent, BarChart3, AlertTriangle } from 'lucide-react';
 import { useFunnelStore } from '@/lib/store/funnelStore';
 import { getNodeConfig } from './nodes';
 import { cn } from '@/lib/utils';
@@ -14,8 +14,10 @@ interface FunnelStep {
   visitors: number;
   conversionRate: number;
   dropoffRate: number;
+  lostVisitors: number;
   cost?: number;
   color: string;
+  isBottleneck?: boolean;
 }
 
 export const ConversionFunnelPanel = () => {
@@ -61,6 +63,8 @@ export const ConversionFunnelPanel = () => {
         conversionRate = nodeConversionRate;
       }
       
+      const lostVisitors = incomingVisitors > visitors ? incomingVisitors - visitors : 0;
+      
       orderedSteps.push({
         id: node.id,
         name: (node.data?.label as string) || 'Sem nome',
@@ -68,6 +72,7 @@ export const ConversionFunnelPanel = () => {
         visitors,
         conversionRate,
         dropoffRate: 100 - conversionRate,
+        lostVisitors,
         cost: node.data?.cost as number | undefined,
         color: config?.color || 'hsl(var(--muted-foreground))',
       });
@@ -98,15 +103,16 @@ export const ConversionFunnelPanel = () => {
       if (prevVisitors > 0) {
         orderedSteps[i].conversionRate = Math.round((currentVisitors / prevVisitors) * 100);
         orderedSteps[i].dropoffRate = 100 - orderedSteps[i].conversionRate;
+        orderedSteps[i].lostVisitors = prevVisitors - currentVisitors;
       }
     }
     
     return orderedSteps;
   }, [nodes, edges]);
 
-  // Calculate totals
-  const totals = useMemo(() => {
-    if (funnelSteps.length === 0) return null;
+  // Calculate totals and identify bottleneck
+  const { totals, biggestBottleneck } = useMemo(() => {
+    if (funnelSteps.length === 0) return { totals: null, biggestBottleneck: null };
     
     const firstStep = funnelSteps[0];
     const lastStep = funnelSteps[funnelSteps.length - 1];
@@ -114,13 +120,35 @@ export const ConversionFunnelPanel = () => {
     const overallConversion = firstStep.visitors > 0 
       ? Math.round((lastStep.visitors / firstStep.visitors) * 100) 
       : 0;
+    const totalLost = firstStep.visitors - lastStep.visitors;
+    
+    // Find the biggest bottleneck (step with lowest conversion rate, excluding first and 100% steps)
+    let bottleneck: FunnelStep | null = null;
+    let maxLoss = 0;
+    
+    funnelSteps.forEach((step, index) => {
+      if (index > 0 && step.lostVisitors > maxLoss && step.conversionRate < 100) {
+        maxLoss = step.lostVisitors;
+        bottleneck = step;
+      }
+    });
+    
+    // Mark bottleneck in steps
+    if (bottleneck) {
+      const bottleneckStep = funnelSteps.find(s => s.id === bottleneck!.id);
+      if (bottleneckStep) bottleneckStep.isBottleneck = true;
+    }
     
     return {
-      totalVisitors: firstStep.visitors,
-      totalConversions: lastStep.visitors,
-      overallConversion,
-      totalCost,
-      cpa: lastStep.visitors > 0 ? Math.round(totalCost / lastStep.visitors) : 0,
+      totals: {
+        totalVisitors: firstStep.visitors,
+        totalConversions: lastStep.visitors,
+        overallConversion,
+        totalCost,
+        totalLost,
+        cpa: lastStep.visitors > 0 ? Math.round(totalCost / lastStep.visitors) : 0,
+      },
+      biggestBottleneck: bottleneck,
     };
   }, [funnelSteps]);
 
@@ -181,6 +209,20 @@ export const ConversionFunnelPanel = () => {
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
+            {/* Bottleneck Alert */}
+            {biggestBottleneck && biggestBottleneck.lostVisitors > 0 && (
+              <div className="mx-3 mt-3 p-2.5 bg-destructive/10 border border-destructive/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertTriangle className="w-4 h-4 text-destructive" />
+                  <span className="text-xs font-semibold text-destructive">Maior Gargalo</span>
+                </div>
+                <p className="text-[11px] text-foreground">
+                  <span className="font-semibold">{biggestBottleneck.name}</span> está perdendo{' '}
+                  <span className="font-bold text-destructive">{biggestBottleneck.lostVisitors.toLocaleString()}</span> pessoas ({biggestBottleneck.dropoffRate}% de drop)
+                </p>
+              </div>
+            )}
+
             {/* Summary Cards */}
             {totals && (
               <div className="p-3 border-b border-border">
@@ -201,20 +243,20 @@ export const ConversionFunnelPanel = () => {
                   </div>
                   <div className="bg-muted/30 rounded-lg p-2.5">
                     <div className="flex items-center gap-1.5 mb-1">
+                      <TrendingDown className="w-3 h-3 text-destructive" />
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Perdidos</span>
+                    </div>
+                    <p className="text-lg font-bold text-destructive">
+                      -{totals.totalLost.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-2.5">
+                    <div className="flex items-center gap-1.5 mb-1">
                       <Percent className="w-3 h-3 text-muted-foreground" />
                       <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Taxa Total</span>
                     </div>
                     <p className={cn("text-lg font-bold", getConversionColor(totals.overallConversion))}>
                       {totals.overallConversion}%
-                    </p>
-                  </div>
-                  <div className="bg-muted/30 rounded-lg p-2.5">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <DollarSign className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">CPA</span>
-                    </div>
-                    <p className="text-lg font-bold text-foreground">
-                      {totals.cpa > 0 ? `R$${totals.cpa}` : '-'}
                     </p>
                   </div>
                 </div>
@@ -251,15 +293,23 @@ export const ConversionFunnelPanel = () => {
                         initial={{ x: 20, opacity: 0 }}
                         animate={{ x: 0, opacity: 1 }}
                         transition={{ delay: index * 0.05 }}
-                        className="bg-muted/20 rounded-lg p-2.5 border border-border/50 hover:border-border transition-colors"
+                        className={cn(
+                          "rounded-lg p-2.5 border transition-colors",
+                          step.isBottleneck 
+                            ? "bg-destructive/10 border-destructive/40" 
+                            : "bg-muted/20 border-border/50 hover:border-border"
+                        )}
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
+                            {step.isBottleneck && (
+                              <AlertTriangle className="w-3 h-3 text-destructive" />
+                            )}
                             <div 
                               className="w-2 h-2 rounded-full"
                               style={{ backgroundColor: step.color }}
                             />
-                            <span className="text-xs font-medium text-foreground truncate max-w-[140px]">
+                            <span className="text-xs font-medium text-foreground truncate max-w-[120px]">
                               {step.name}
                             </span>
                           </div>
@@ -272,7 +322,7 @@ export const ConversionFunnelPanel = () => {
                         <div className="relative h-1.5 bg-muted rounded-full overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
-                            animate={{ width: `${step.conversionRate}%` }}
+                            animate={{ width: `${Math.min(step.conversionRate, 100)}%` }}
                             transition={{ duration: 0.5, delay: index * 0.1 }}
                             className={cn("h-full rounded-full", getBarColor(step.conversionRate))}
                           />
@@ -280,7 +330,7 @@ export const ConversionFunnelPanel = () => {
                         
                         <div className="flex items-center justify-between mt-1.5">
                           <div className="flex items-center gap-1">
-                          {index > 0 && (
+                            {index > 0 && (
                               step.conversionRate >= 50 ? (
                                 <TrendingUp className="w-3 h-3 text-[hsl(142_76%_36%)]" />
                               ) : (
@@ -291,12 +341,12 @@ export const ConversionFunnelPanel = () => {
                               "text-[10px] font-medium",
                               index === 0 ? "text-muted-foreground" : getConversionColor(step.conversionRate)
                             )}>
-                              {index === 0 ? 'Início' : `${step.conversionRate}% conversão`}
+                              {index === 0 ? 'Início' : `${step.conversionRate}%`}
                             </span>
                           </div>
-                          {index > 0 && step.dropoffRate > 0 && (
-                            <span className="text-[10px] text-muted-foreground">
-                              -{step.dropoffRate}% drop
+                          {index > 0 && step.lostVisitors > 0 && (
+                            <span className="text-[10px] font-medium text-destructive">
+                              -{step.lostVisitors.toLocaleString()} pessoas
                             </span>
                           )}
                         </div>
@@ -310,7 +360,7 @@ export const ConversionFunnelPanel = () => {
             {/* Footer */}
             <div className="px-3 pb-3">
               <p className="text-[9px] text-muted-foreground text-center">
-                💡 Selecione um nó e preencha as métricas no painel de propriedades
+                💡 Valores calculados automaticamente • Edite as métricas nos nós
               </p>
             </div>
           </motion.div>

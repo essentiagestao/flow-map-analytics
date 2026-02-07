@@ -20,6 +20,7 @@ import {
   getNodeConfig,
 } from './nodeTypes';
 import { useFunnelStore } from '@/lib/store/funnelStore';
+import { getDefaultMetrics } from '@/lib/utils/defaultMetrics';
 import { Node } from '@xyflow/react';
 
 interface AddNodeHandleProps {
@@ -129,6 +130,7 @@ export const AddNodeHandle = ({ nodeId, position, currentNodeType }: AddNodeHand
     
     const size = defaultSizes[nodeType.category];
     const offsetX = position === Position.Right ? 200 : -200;
+    const defaultMetrics = getDefaultMetrics(nodeType.id, nodeType.category);
     
     const newNode: Node = {
       id: `${nodeType.id}-${Date.now()}`,
@@ -143,6 +145,7 @@ export const AddNodeHandle = ({ nodeId, position, currentNodeType }: AddNodeHand
         url: '',
         width: size.width,
         height: size.height,
+        ...defaultMetrics,
       },
     };
 
