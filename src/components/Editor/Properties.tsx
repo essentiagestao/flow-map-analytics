@@ -11,7 +11,7 @@ import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFunnelStore } from '@/lib/store/funnelStore';
 import { getNodeConfig, NodeCategory } from './nodes';
-import { Copy, Trash2, Lock, Unlock, Layers, Move, Palette, Settings2, ArrowRight, Minus } from 'lucide-react';
+import { Copy, Trash2, Lock, Unlock, Layers, Move, Palette, Settings2, ArrowRight, Users, Percent, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PropertiesProps {
@@ -43,6 +43,9 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
     label: '',
     url: '',
     meta: 0,
+    visitors: 0,
+    conversionRate: 0,
+    cost: 0,
     color: '',
     tags: '',
     notes: '',
@@ -58,6 +61,9 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
         label: String(selectedNode.data.label || ''),
         url: String(selectedNode.data.url || ''),
         meta: Number(selectedNode.data.meta || 0),
+        visitors: Number(selectedNode.data.visitors || 0),
+        conversionRate: Number(selectedNode.data.conversionRate || 0),
+        cost: Number(selectedNode.data.cost || 0),
         color: String(selectedNode.data.color || ''),
         tags: String(selectedNode.data.tags || ''),
         notes: String(selectedNode.data.notes || ''),
@@ -383,18 +389,111 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="node-meta" className="text-sm font-medium">
-                Meta de Conversão
-              </Label>
-              <Input
-                id="node-meta"
-                type="number"
-                value={formData.meta}
-                onChange={(e) => handleInputChange('meta', parseInt(e.target.value) || 0)}
-                placeholder="Ex: 1000"
-                disabled={isLocked}
-              />
+            {/* Metrics Section - Different fields based on node category */}
+            <div className="pt-2 border-t border-border">
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-semibold text-foreground">Métricas</span>
+              </div>
+              
+              {/* Traffic & Communication: Quantity of people */}
+              {(config?.category === 'traffic' || config?.category === 'communication') && (
+                <>
+                  <div className="space-y-2 mb-3">
+                    <Label htmlFor="node-visitors" className="text-sm font-medium flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                      Quantidade de Pessoas
+                    </Label>
+                    <Input
+                      id="node-visitors"
+                      type="number"
+                      value={formData.visitors}
+                      onChange={(e) => handleInputChange('visitors', parseInt(e.target.value) || 0)}
+                      placeholder="Ex: 1000"
+                      disabled={isLocked}
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      {config?.category === 'traffic' 
+                        ? 'Total de visitantes desta fonte de tráfego' 
+                        : 'Quantidade de pessoas que receberão a comunicação'}
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="node-cost" className="text-sm font-medium">
+                      Custo (R$)
+                    </Label>
+                    <Input
+                      id="node-cost"
+                      type="number"
+                      value={formData.cost}
+                      onChange={(e) => handleInputChange('cost', parseFloat(e.target.value) || 0)}
+                      placeholder="Ex: 500"
+                      disabled={isLocked}
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Investimento total nesta etapa
+                    </p>
+                  </div>
+                </>
+              )}
+              
+              {/* Pages & Events: Conversion rate */}
+              {(config?.category === 'page' || config?.category === 'event') && (
+                <>
+                  <div className="space-y-2 mb-3">
+                    <Label htmlFor="node-conversion-rate" className="text-sm font-medium flex items-center gap-2">
+                      <Percent className="w-3.5 h-3.5 text-muted-foreground" />
+                      Taxa de Conversão (%)
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[formData.conversionRate]}
+                        onValueChange={(value) => handleInputChange('conversionRate', value[0])}
+                        min={0}
+                        max={100}
+                        step={1}
+                        disabled={isLocked}
+                        className="flex-1"
+                      />
+                      <Input
+                        id="node-conversion-rate"
+                        type="number"
+                        value={formData.conversionRate}
+                        onChange={(e) => handleInputChange('conversionRate', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                        className="w-16 text-center"
+                        min={0}
+                        max={100}
+                        disabled={isLocked}
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {config?.category === 'page' 
+                        ? 'Percentual de visitantes que avançam para a próxima etapa' 
+                        : 'Taxa de conversão deste evento'}
+                    </p>
+                  </div>
+                  
+                  {config?.category === 'page' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="node-cost-page" className="text-sm font-medium">
+                        Custo da Página (R$)
+                      </Label>
+                      <Input
+                        id="node-cost-page"
+                        type="number"
+                        value={formData.cost}
+                        onChange={(e) => handleInputChange('cost', parseFloat(e.target.value) || 0)}
+                        placeholder="Ex: 100"
+                        disabled={isLocked}
+                      />
+                      <p className="text-[10px] text-muted-foreground">
+                        Custo operacional da página (hosting, ferramentas, etc.)
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             <div className="space-y-2">

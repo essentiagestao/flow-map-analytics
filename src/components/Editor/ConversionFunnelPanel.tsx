@@ -34,8 +34,9 @@ export const ConversionFunnelPanel = () => {
     // Build ordered list by following edges
     const orderedSteps: FunnelStep[] = [];
     const visited = new Set<string>();
+    let previousVisitors = 0;
     
-    const traverse = (nodeId: string) => {
+    const traverse = (nodeId: string, incomingVisitors: number) => {
       if (visited.has(nodeId)) return;
       visited.add(nodeId);
       
@@ -43,45 +44,59 @@ export const ConversionFunnelPanel = () => {
       if (!node) return;
       
       const config = getNodeConfig(node.data?.nodeType as string);
-      const meta = node.data?.meta as number | undefined;
+      const category = config?.category;
+      
+      let visitors = 0;
+      let conversionRate = 0;
+      
+      // Traffic & Communication: Use direct visitor count
+      if (category === 'traffic' || category === 'communication') {
+        visitors = (node.data?.visitors as number) || 0;
+        conversionRate = incomingVisitors > 0 ? 100 : 100; // First step is always 100%
+      } 
+      // Pages & Events: Calculate visitors from previous step * conversion rate
+      else {
+        const nodeConversionRate = (node.data?.conversionRate as number) || 0;
+        visitors = incomingVisitors > 0 ? Math.round(incomingVisitors * (nodeConversionRate / 100)) : 0;
+        conversionRate = nodeConversionRate;
+      }
       
       orderedSteps.push({
         id: node.id,
         name: (node.data?.label as string) || 'Sem nome',
         nodeType: (node.data?.nodeType as string) || 'unknown',
-        visitors: meta || Math.floor(Math.random() * 1000) + 100, // Simulated if no data
-        conversionRate: 0, // Will calculate after
-        dropoffRate: 0,
+        visitors,
+        conversionRate,
+        dropoffRate: 100 - conversionRate,
         cost: node.data?.cost as number | undefined,
         color: config?.color || 'hsl(var(--muted-foreground))',
       });
       
-      // Find outgoing edges
+      // Find outgoing edges and pass current visitors to next nodes
       const outgoingEdges = edges.filter(e => e.source === nodeId);
-      outgoingEdges.forEach(edge => traverse(edge.target));
+      outgoingEdges.forEach(edge => traverse(edge.target, visitors));
     };
     
     // Start traversal from all start nodes
-    startNodes.forEach(node => traverse(node.id));
+    startNodes.forEach(node => {
+      const nodeData = nodes.find(n => n.id === node.id);
+      const initialVisitors = (nodeData?.data?.visitors as number) || 0;
+      traverse(node.id, initialVisitors);
+    });
     
     // Also traverse any nodes not yet visited (disconnected)
     nodes.forEach(node => {
       if (!visited.has(node.id)) {
-        traverse(node.id);
+        traverse(node.id, 0);
       }
     });
     
-    // Calculate conversion rates
-    for (let i = 0; i < orderedSteps.length; i++) {
-      if (i === 0) {
-        orderedSteps[i].conversionRate = 100;
-        orderedSteps[i].dropoffRate = 0;
-      } else {
-        const prevVisitors = orderedSteps[i - 1].visitors;
-        const currentVisitors = orderedSteps[i].visitors;
-        orderedSteps[i].conversionRate = prevVisitors > 0 
-          ? Math.round((currentVisitors / prevVisitors) * 100) 
-          : 0;
+    // Recalculate conversion rates between steps for display
+    for (let i = 1; i < orderedSteps.length; i++) {
+      const prevVisitors = orderedSteps[i - 1].visitors;
+      const currentVisitors = orderedSteps[i].visitors;
+      if (prevVisitors > 0) {
+        orderedSteps[i].conversionRate = Math.round((currentVisitors / prevVisitors) * 100);
         orderedSteps[i].dropoffRate = 100 - orderedSteps[i].conversionRate;
       }
     }
@@ -295,7 +310,7 @@ export const ConversionFunnelPanel = () => {
             {/* Footer */}
             <div className="px-3 pb-3">
               <p className="text-[9px] text-muted-foreground text-center">
-                💡 Valores simulados • Clique nos nós para editar métricas
+                💡 Selecione um nó e preencha as métricas no painel de propriedades
               </p>
             </div>
           </motion.div>
