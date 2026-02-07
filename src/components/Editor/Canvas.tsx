@@ -25,6 +25,7 @@ import '@xyflow/react/dist/style.css';
 import { useFunnelStore } from '@/lib/store/funnelStore';
 import { AlignmentToolbar } from './AlignmentToolbar';
 import { ConversionFunnelPanel } from './ConversionFunnelPanel';
+import { getDefaultMetrics } from '@/lib/utils/defaultMetrics';
 import { 
   TrafficNode, 
   PageNode, 
@@ -326,6 +327,7 @@ const CanvasComponent = () => {
     };
 
     const size = defaultSizes[category];
+    const defaultMetrics = getDefaultMetrics(nodeType, category);
 
     const newNode: Node = {
       id: `${nodeType}-${Date.now()}`,
@@ -337,6 +339,7 @@ const CanvasComponent = () => {
         url: '',
         width: size.width,
         height: size.height,
+        ...defaultMetrics,
       },
     };
 
