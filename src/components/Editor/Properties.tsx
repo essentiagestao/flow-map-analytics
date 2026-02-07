@@ -108,11 +108,11 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
     return totalVisitors;
   };
 
+  // Memoize calculated visitors to avoid recalculating on every render
+  const calculatedVisitors = selectedNode ? calculateIncomingVisitors(selectedNode.id) : 0;
+
   useEffect(() => {
     if (selectedNode?.data) {
-      const calculatedVisitors = calculateIncomingVisitors(selectedNode.id);
-      const nodeConfig = getNodeConfig(String(selectedNode.data.nodeType));
-      
       setFormData({
         label: String(selectedNode.data.label || ''),
         url: String(selectedNode.data.url || ''),
@@ -130,18 +130,8 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
         height: Number(selectedNode.data.height || 140),
       });
       setIsLocked(Boolean(selectedNode.data.locked));
-      
-      // Update calculated visitors in the node data for non-traffic nodes
-      if (calculatedVisitors > 0 && nodeConfig?.category !== 'traffic') {
-        updateNode(selectedNode.id, {
-          data: {
-            ...selectedNode.data,
-            calculatedVisitors,
-          }
-        });
-      }
     }
-  }, [selectedNode, edges, nodes, updateNode]);
+  }, [selectedNode, calculatedVisitors]);
 
   const handleInputChange = (field: string, value: string | number) => {
     if (isLocked && field !== 'locked') return;
