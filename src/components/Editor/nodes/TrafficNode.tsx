@@ -19,6 +19,14 @@ export const TrafficNode = ({ id, data, selected }: TrafficNodeProps) => {
   const bgColor = config?.bgColor || '#3B82F6';
   const size = data.width || 64;
 
+  const handleClass = `
+    !w-3 !h-3 !rounded-full !border-2 
+    !bg-card !border-muted-foreground/40
+    hover:!bg-primary hover:!border-primary hover:!scale-125
+    !transition-all !duration-200
+    ${selected ? '!opacity-100' : '!opacity-0 group-hover:!opacity-100'}
+  `;
+
   return (
     <div className="relative group" style={{ width: size, height: size }}>
       <NodeResizer 
@@ -32,11 +40,12 @@ export const TrafficNode = ({ id, data, selected }: TrafficNodeProps) => {
         handleClassName="!w-2.5 !h-2.5 !bg-primary !border-2 !border-background !rounded-sm"
       />
       
-      {/* Hidden handles for edge connections */}
+      {/* Connection handles - visible on hover */}
       <Handle 
         type="target" 
         position={Position.Left} 
-        className="!w-3 !h-3 !opacity-0"
+        className={handleClass}
+        style={{ left: -6 }}
       />
       
       <div
@@ -63,11 +72,12 @@ export const TrafficNode = ({ id, data, selected }: TrafficNodeProps) => {
         </span>
       </div>
       
-      {/* Hidden handle for edge connections */}
+      {/* Connection handles - visible on hover */}
       <Handle 
         type="source" 
         position={Position.Right} 
-        className="!w-3 !h-3 !opacity-0"
+        className={handleClass}
+        style={{ right: -6 }}
       />
       
       {/* Add node button - only show on hover or selection */}

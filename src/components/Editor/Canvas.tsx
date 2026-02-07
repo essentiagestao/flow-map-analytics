@@ -16,7 +16,9 @@ import {
   NodeChange,
   OnSelectionChangeParams,
   BackgroundVariant,
-  applyNodeChanges,
+  EdgeProps,
+  getBezierPath,
+  getSmoothStepPath,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -45,6 +47,68 @@ const categoryToNodeType: Record<NodeCategory, keyof typeof nodeTypes> = {
   event: 'event',
 };
 
+// Custom edge component with selection support
+const CustomEdge = ({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+  data,
+  selected,
+}: EdgeProps) => {
+  const { selectedEdgeId, setSelectedEdgeId } = useFunnelStore();
+  const isSelected = selected || selectedEdgeId === id;
+  const isDashed = data?.style === 'dashed';
+  
+  const [edgePath] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+
+  return (
+    <>
+      {/* Invisible wider path for easier clicking */}
+      <path
+        d={edgePath}
+        fill="none"
+        strokeWidth={20}
+        stroke="transparent"
+        className="cursor-pointer"
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelectedEdgeId(id);
+        }}
+      />
+      {/* Visible edge */}
+      <path
+        id={id}
+        d={edgePath}
+        fill="none"
+        strokeWidth={isSelected ? 3 : 2}
+        stroke={isSelected ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}
+        strokeDasharray={isDashed ? '8 4' : undefined}
+        className="transition-all duration-200 cursor-pointer"
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelectedEdgeId(id);
+        }}
+      />
+    </>
+  );
+};
+
+const edgeTypes = {
+  custom: CustomEdge,
+};
+
 const CanvasComponent = () => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   // Track drag state to prevent store from overwriting local positions during drag
@@ -59,8 +123,10 @@ const CanvasComponent = () => {
     addEdge: storeAddEdge,
     setSelectedNodeId,
     setSelectedNodeIds,
+    setSelectedEdgeId,
     selectedNodeId,
     selectedNodeIds,
+    selectedEdgeId,
     setNodes: setStoreNodes,
     setEdges: setStoreEdges,
     updateNode,
@@ -215,15 +281,11 @@ const CanvasComponent = () => {
 
   const onConnect = useCallback((params: Connection) => {
     const newEdge: Edge = {
-      id: `e${params.source}-${params.target}`,
+      id: `e${params.source}-${params.target}-${Date.now()}`,
       source: params.source!,
       target: params.target!,
-      type: 'smoothstep',
-      style: { 
-        stroke: 'hsl(var(--muted-foreground))', 
-        strokeWidth: 2,
-      },
-      animated: false,
+      type: 'custom',
+      data: { style: 'solid' },
     };
     storeAddEdge(newEdge);
   }, [storeAddEdge]);
@@ -290,7 +352,13 @@ const CanvasComponent = () => {
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
     setSelectedNodeIds([]);
-  }, [setSelectedNodeId, setSelectedNodeIds]);
+    setSelectedEdgeId(null);
+  }, [setSelectedNodeId, setSelectedNodeIds, setSelectedEdgeId]);
+
+  // Handle edge click
+  const onEdgeClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
+    setSelectedEdgeId(edge.id);
+  }, [setSelectedEdgeId]);
 
   // Handle multi-select (box selection)
   const onSelectionChange = useCallback(({ nodes: selectedNodes }: OnSelectionChangeParams) => {
@@ -309,13 +377,20 @@ const CanvasComponent = () => {
     (window as any).reactFlowFitView = () => fitView();
   }, [zoomIn, zoomOut, fitView]);
 
+  // Transform edges to use custom type
+  const edgesWithType = edges.map(edge => ({
+    ...edge,
+    type: 'custom',
+    selected: edge.id === selectedEdgeId,
+  }));
+
   return (
     <div className="w-full h-full relative" ref={reactFlowWrapper}>
       <AlignmentToolbar />
       
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={edgesWithType}
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -323,10 +398,12 @@ const CanvasComponent = () => {
         onDragOver={onDragOver}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
+        onEdgeClick={onEdgeClick}
         onSelectionChange={onSelectionChange}
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         snapToGrid
         snapGrid={[20, 20]}
@@ -344,12 +421,8 @@ const CanvasComponent = () => {
         deleteKeyCode={null}
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{
-          type: 'smoothstep',
-          style: { 
-            stroke: 'hsl(var(--muted-foreground))', 
-            strokeWidth: 2,
-          },
-          animated: false,
+          type: 'custom',
+          data: { style: 'solid' },
         }}
         className="bg-[hsl(var(--muted))]"
       >
