@@ -24,6 +24,7 @@ import '@xyflow/react/dist/style.css';
 
 import { useFunnelStore } from '@/lib/store/funnelStore';
 import { AlignmentToolbar } from './AlignmentToolbar';
+import { ConversionFunnelPanel } from './ConversionFunnelPanel';
 import { 
   TrafficNode, 
   PageNode, 
@@ -387,6 +388,7 @@ const CanvasComponent = () => {
   return (
     <div className="w-full h-full relative" ref={reactFlowWrapper}>
       <AlignmentToolbar />
+      <ConversionFunnelPanel />
       
       <ReactFlow
         nodes={nodes}

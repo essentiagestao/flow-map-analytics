@@ -251,15 +251,16 @@ export const AddNodeHandle = ({ nodeId, position, currentNodeType }: AddNodeHand
       <PopoverContent 
         side={position === Position.Right ? 'right' : 'left'} 
         align="start"
-        className="w-64 p-0 bg-card border-border shadow-xl rounded-xl overflow-hidden"
+        className="w-64 p-0 bg-card border-border shadow-xl rounded-xl overflow-hidden z-[100]"
         sideOffset={8}
+        onWheel={(e) => e.stopPropagation()}
       >
         <div className="p-3 border-b border-border bg-muted/30">
           <h4 className="text-sm font-semibold text-foreground">Adicionar próximo passo</h4>
           <p className="text-xs text-muted-foreground mt-0.5">Conecte um novo elemento ao funil</p>
         </div>
         
-        <ScrollArea className="max-h-80">
+        <ScrollArea className="h-[320px]">
           {/* Suggestions Section */}
           {suggestions.length > 0 && (
             <div className="p-2 border-b border-border">
