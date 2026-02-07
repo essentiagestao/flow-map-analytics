@@ -148,16 +148,13 @@ export const AddNodeHandle = ({ nodeId, position, currentNodeType }: AddNodeHand
 
     addNode(newNode);
     
-    // Create edge
+    // Create edge with custom type
     const newEdge = {
-      id: `e${nodeId}-${newNode.id}`,
+      id: `e${nodeId}-${newNode.id}-${Date.now()}`,
       source: position === Position.Right ? nodeId : newNode.id,
       target: position === Position.Right ? newNode.id : nodeId,
-      type: 'smoothstep',
-      style: { 
-        stroke: 'hsl(var(--muted-foreground))', 
-        strokeWidth: 2,
-      },
+      type: 'custom',
+      data: { style: 'solid' },
     };
     
     addEdge(newEdge);

@@ -20,6 +20,14 @@ export const PageNode = ({ id, data, selected }: PageNodeProps) => {
   const width = data.width || 160;
   const height = data.height || 140;
 
+  const handleClass = `
+    !w-3 !h-3 !rounded-full !border-2 
+    !bg-card !border-muted-foreground/40
+    hover:!bg-primary hover:!border-primary hover:!scale-125
+    !transition-all !duration-200
+    ${selected ? '!opacity-100' : '!opacity-0 group-hover:!opacity-100'}
+  `;
+
   return (
     <div className="relative group" style={{ width, height }}>
       <NodeResizer 
@@ -32,10 +40,12 @@ export const PageNode = ({ id, data, selected }: PageNodeProps) => {
         handleClassName="!w-2.5 !h-2.5 !bg-primary !border-2 !border-background !rounded-sm"
       />
       
+      {/* Connection handles - visible on hover */}
       <Handle 
         type="target" 
         position={Position.Left} 
-        className="!w-3 !h-3 !opacity-0"
+        className={handleClass}
+        style={{ left: -6 }}
       />
       
       <div
@@ -77,10 +87,12 @@ export const PageNode = ({ id, data, selected }: PageNodeProps) => {
         </div>
       </div>
       
+      {/* Connection handles - visible on hover */}
       <Handle 
         type="source" 
         position={Position.Right} 
-        className="!w-3 !h-3 !opacity-0"
+        className={handleClass}
+        style={{ right: -6 }}
       />
       
       <div className={`${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>

@@ -18,6 +18,14 @@ export const EventNode = ({ id, data, selected }: EventNodeProps) => {
   const config = getNodeConfig(data.nodeType);
   const size = data.width || 56;
 
+  const handleClass = `
+    !w-3 !h-3 !rounded-full !border-2 
+    !bg-card !border-muted-foreground/40
+    hover:!bg-primary hover:!border-primary hover:!scale-125
+    !transition-all !duration-200
+    ${selected ? '!opacity-100' : '!opacity-0 group-hover:!opacity-100'}
+  `;
+
   return (
     <div className="relative group" style={{ width: size, height: size }}>
       <NodeResizer 
@@ -31,11 +39,12 @@ export const EventNode = ({ id, data, selected }: EventNodeProps) => {
         handleClassName="!w-2.5 !h-2.5 !bg-primary !border-2 !border-background !rounded-sm"
       />
       
+      {/* Connection handles - visible on hover */}
       <Handle 
         type="target" 
         position={Position.Left} 
-        className="!w-3 !h-3 !opacity-0"
-        style={{ top: '50%' }}
+        className={handleClass}
+        style={{ left: -6, top: '50%' }}
       />
       
       {/* Diamond shape container */}
@@ -82,11 +91,12 @@ export const EventNode = ({ id, data, selected }: EventNodeProps) => {
         </span>
       </div>
       
+      {/* Connection handles - visible on hover */}
       <Handle 
         type="source" 
         position={Position.Right} 
-        className="!w-3 !h-3 !opacity-0"
-        style={{ top: '50%' }}
+        className={handleClass}
+        style={{ right: -6, top: '50%' }}
       />
       
       <div className={`${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>

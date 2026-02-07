@@ -11,7 +11,7 @@ import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFunnelStore } from '@/lib/store/funnelStore';
 import { getNodeConfig, NodeCategory } from './nodes';
-import { Copy, Trash2, Lock, Unlock, Layers, Move, Palette, Settings2 } from 'lucide-react';
+import { Copy, Trash2, Lock, Unlock, Layers, Move, Palette, Settings2, ArrowRight, Minus } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PropertiesProps {
@@ -24,14 +24,19 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
     edges,
     selectedNodeId,
     selectedNodeIds,
+    selectedEdgeId,
     updateNode, 
+    updateEdge,
     removeNode,
     removeNodes,
+    removeEdge,
     addNode,
-    setSelectedNodeId 
+    setSelectedNodeId,
+    setSelectedEdgeId,
   } = useFunnelStore();
   
   const selectedNode = nodes.find(node => node.id === selectedNodeId);
+  const selectedEdge = edges.find(edge => edge.id === selectedEdgeId);
   const selectedCount = selectedNodeIds.length;
   
   const [formData, setFormData] = useState({
@@ -160,6 +165,97 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
 
   const connections = getConnectionsInfo();
   const config = selectedNode ? getNodeConfig(String(selectedNode.data.nodeType)) : null;
+
+  // Get source and target node labels for edge
+  const getEdgeNodeLabels = () => {
+    if (!selectedEdge) return { source: '', target: '' };
+    const sourceNode = nodes.find(n => n.id === selectedEdge.source);
+    const targetNode = nodes.find(n => n.id === selectedEdge.target);
+    return {
+      source: sourceNode?.data?.label as string || selectedEdge.source,
+      target: targetNode?.data?.label as string || selectedEdge.target,
+    };
+  };
+
+  // Edge properties panel
+  if (selectedEdge) {
+    const edgeLabels = getEdgeNodeLabels();
+    const edgeStyle = (selectedEdge.data?.style as string) || 'solid';
+
+    return (
+      <div className="p-4 h-full overflow-y-auto">
+        <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
+          <ArrowRight className="w-5 h-5" />
+          Conexão
+        </h3>
+        
+        <Card className="p-4 space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Conexão</Label>
+            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+              <span className="text-sm font-medium truncate">{edgeLabels.source}</span>
+              <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm font-medium truncate">{edgeLabels.target}</span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edge-style" className="text-sm font-medium">
+              Estilo da Linha
+            </Label>
+            <Select 
+              value={edgeStyle} 
+              onValueChange={(value) => {
+                updateEdge(selectedEdge.id, {
+                  data: { ...selectedEdge.data, style: value }
+                });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o estilo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="solid">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-0.5 bg-foreground" />
+                    Linha Contínua
+                  </div>
+                </SelectItem>
+                <SelectItem value="dashed">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-0.5 border-t-2 border-dashed border-foreground" />
+                    Linha Tracejada
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="pt-4">
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                removeEdge(selectedEdge.id);
+                setSelectedEdgeId(null);
+                toast.success('Conexão removida');
+              }}
+              className="w-full"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Remover Conexão
+            </Button>
+          </div>
+        </Card>
+
+        <div className="mt-4 p-3 bg-muted rounded-lg">
+          <h4 className="text-sm font-medium mb-2 text-foreground">Dica</h4>
+          <p className="text-xs text-muted-foreground">
+            Para criar novas conexões, passe o mouse sobre um nó e arraste a partir dos pontos de conexão que aparecem nas laterais.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Multi-selection panel
   if (selectedCount > 1) {

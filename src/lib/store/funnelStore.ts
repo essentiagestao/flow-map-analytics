@@ -11,6 +11,7 @@ interface FunnelStore {
   edges: Edge[];
   selectedNodeId: string | null;
   selectedNodeIds: string[];
+  selectedEdgeId: string | null;
   history: FunnelHistory[];
   historyIndex: number;
   dirty: boolean;
@@ -23,9 +24,11 @@ interface FunnelStore {
   removeNode: (id: string) => void;
   removeNodes: (ids: string[]) => void;
   addEdge: (edge: Edge) => void;
+  updateEdge: (id: string, updates: Partial<Edge>) => void;
   removeEdge: (id: string) => void;
   setSelectedNodeId: (id: string | null) => void;
   setSelectedNodeIds: (ids: string[]) => void;
+  setSelectedEdgeId: (id: string | null) => void;
   clear: () => void;
   loadSample: () => void;
   saveToLocal: () => void;
@@ -48,6 +51,7 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   edges: [],
   selectedNodeId: null,
   selectedNodeIds: [],
+  selectedEdgeId: null,
   history: [],
   historyIndex: -1,
   dirty: false,
@@ -95,23 +99,38 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
     get().pushHistory();
   },
 
+  updateEdge: (id, updates) => {
+    set((state) => ({
+      edges: state.edges.map((edge) =>
+        edge.id === id ? { ...edge, ...updates } : edge
+      ),
+      dirty: true,
+    }));
+  },
+
   removeEdge: (id) => {
     set((state) => ({
       edges: state.edges.filter((edge) => edge.id !== id),
+      selectedEdgeId: state.selectedEdgeId === id ? null : state.selectedEdgeId,
       dirty: true,
     }));
     get().pushHistory();
   },
 
   setSelectedNodeId: (id) => {
-    set({ selectedNodeId: id, selectedNodeIds: id ? [id] : [] });
+    set({ selectedNodeId: id, selectedNodeIds: id ? [id] : [], selectedEdgeId: null });
   },
 
   setSelectedNodeIds: (ids) => {
     set({ 
       selectedNodeIds: ids, 
-      selectedNodeId: ids.length > 0 ? ids[0] : null 
+      selectedNodeId: ids.length > 0 ? ids[0] : null,
+      selectedEdgeId: null,
     });
+  },
+
+  setSelectedEdgeId: (id) => {
+    set({ selectedEdgeId: id, selectedNodeId: null, selectedNodeIds: [] });
   },
 
   removeNodes: (ids) => {
