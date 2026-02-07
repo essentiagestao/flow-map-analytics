@@ -44,7 +44,10 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
     url: '',
     meta: 0,
     visitors: 0,
+    calculatedVisitors: 0,
     conversionRate: 0,
+    utilizationRate: 60,
+    splitRatio: 60,
     cost: 0,
     color: '',
     tags: '',
@@ -55,14 +58,70 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
 
   const [isLocked, setIsLocked] = useState(false);
 
+  // Calculate visitors for nodes that receive from previous nodes
+  const calculateIncomingVisitors = (nodeId: string): number => {
+    const incomingEdges = edges.filter(e => e.target === nodeId);
+    if (incomingEdges.length === 0) return 0;
+    
+    let totalVisitors = 0;
+    
+    incomingEdges.forEach(edge => {
+      const sourceNode = nodes.find(n => n.id === edge.source);
+      if (!sourceNode) return;
+      
+      const sourceConfig = getNodeConfig(String(sourceNode.data?.nodeType));
+      const sourceCategory = sourceConfig?.category;
+      
+      // Get source node's output visitors
+      let sourceVisitors = 0;
+      
+      if (sourceCategory === 'traffic') {
+        sourceVisitors = Number(sourceNode.data?.visitors || 0);
+      } else {
+        // For other nodes, use their calculated visitors
+        sourceVisitors = Number(sourceNode.data?.calculatedVisitors || sourceNode.data?.visitors || 0);
+      }
+      
+      // Apply source node's rate to calculate what flows out
+      const sourceRate = Number(
+        sourceNode.data?.conversionRate || 
+        sourceNode.data?.utilizationRate || 
+        100
+      );
+      
+      // Check if source has multiple outgoing edges (split scenario)
+      const sourceOutgoingEdges = edges.filter(e => e.source === edge.source);
+      if (sourceOutgoingEdges.length > 1) {
+        // Get split ratio for this specific edge, or use default
+        const splitRatio = Number(sourceNode.data?.splitRatio || 60);
+        // Simple split: first edge gets splitRatio%, others split the rest
+        const edgeIndex = sourceOutgoingEdges.findIndex(e => e.id === edge.id);
+        const ratio = edgeIndex === 0 ? splitRatio : (100 - splitRatio) / (sourceOutgoingEdges.length - 1);
+        sourceVisitors = Math.round(sourceVisitors * (sourceRate / 100) * (ratio / 100));
+      } else {
+        sourceVisitors = Math.round(sourceVisitors * (sourceRate / 100));
+      }
+      
+      totalVisitors += sourceVisitors;
+    });
+    
+    return totalVisitors;
+  };
+
   useEffect(() => {
     if (selectedNode?.data) {
+      const calculatedVisitors = calculateIncomingVisitors(selectedNode.id);
+      const nodeConfig = getNodeConfig(String(selectedNode.data.nodeType));
+      
       setFormData({
         label: String(selectedNode.data.label || ''),
         url: String(selectedNode.data.url || ''),
         meta: Number(selectedNode.data.meta || 0),
         visitors: Number(selectedNode.data.visitors || 0),
+        calculatedVisitors,
         conversionRate: Number(selectedNode.data.conversionRate || 0),
+        utilizationRate: Number(selectedNode.data.utilizationRate || 60),
+        splitRatio: Number(selectedNode.data.splitRatio || 60),
         cost: Number(selectedNode.data.cost || 0),
         color: String(selectedNode.data.color || ''),
         tags: String(selectedNode.data.tags || ''),
@@ -71,8 +130,18 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
         height: Number(selectedNode.data.height || 140),
       });
       setIsLocked(Boolean(selectedNode.data.locked));
+      
+      // Update calculated visitors in the node data for non-traffic nodes
+      if (calculatedVisitors > 0 && nodeConfig?.category !== 'traffic') {
+        updateNode(selectedNode.id, {
+          data: {
+            ...selectedNode.data,
+            calculatedVisitors,
+          }
+        });
+      }
     }
-  }, [selectedNode]);
+  }, [selectedNode, edges, nodes, updateNode]);
 
   const handleInputChange = (field: string, value: string | number) => {
     if (isLocked && field !== 'locked') return;
@@ -396,8 +465,8 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
                 <span className="text-sm font-semibold text-foreground">Métricas</span>
               </div>
               
-              {/* Traffic & Communication: Quantity of people */}
-              {(config?.category === 'traffic' || config?.category === 'communication') && (
+              {/* Traffic: Manual quantity of people */}
+              {config?.category === 'traffic' && (
                 <>
                   <div className="space-y-2 mb-3">
                     <Label htmlFor="node-visitors" className="text-sm font-medium flex items-center gap-2">
@@ -413,9 +482,7 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
                       disabled={isLocked}
                     />
                     <p className="text-[10px] text-muted-foreground">
-                      {config?.category === 'traffic' 
-                        ? 'Total de visitantes desta fonte de tráfego' 
-                        : 'Quantidade de pessoas que receberão a comunicação'}
+                      Total de visitantes desta fonte de tráfego
                     </p>
                   </div>
                   
@@ -438,9 +505,91 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
                 </>
               )}
               
-              {/* Pages & Events: Conversion rate */}
-              {(config?.category === 'page' || config?.category === 'event') && (
+              {/* Communication: Calculated visitors + Utilization rate */}
+              {config?.category === 'communication' && (
                 <>
+                  <div className="space-y-2 mb-3">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                      Pessoas Recebidas (calculado)
+                    </Label>
+                    <div className="p-2.5 bg-muted/50 rounded-md border border-border">
+                      <span className="text-lg font-bold text-foreground">
+                        {formData.calculatedVisitors.toLocaleString()}
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-2">pessoas</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Calculado automaticamente baseado nas conexões anteriores
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2 mb-3">
+                    <Label htmlFor="node-utilization-rate" className="text-sm font-medium flex items-center gap-2">
+                      <Percent className="w-3.5 h-3.5 text-muted-foreground" />
+                      Taxa de Aproveitamento (%)
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[formData.utilizationRate]}
+                        onValueChange={(value) => handleInputChange('utilizationRate', value[0])}
+                        min={0}
+                        max={100}
+                        step={1}
+                        disabled={isLocked}
+                        className="flex-1"
+                      />
+                      <Input
+                        id="node-utilization-rate"
+                        type="number"
+                        value={formData.utilizationRate}
+                        onChange={(e) => handleInputChange('utilizationRate', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                        className="w-16 text-center"
+                        min={0}
+                        max={100}
+                        disabled={isLocked}
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Percentual de pessoas que interagem com esta comunicação
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="node-cost-comm" className="text-sm font-medium">
+                      Custo (R$)
+                    </Label>
+                    <Input
+                      id="node-cost-comm"
+                      type="number"
+                      value={formData.cost}
+                      onChange={(e) => handleInputChange('cost', parseFloat(e.target.value) || 0)}
+                      placeholder="Ex: 50"
+                      disabled={isLocked}
+                    />
+                  </div>
+                </>
+              )}
+              
+              {/* Pages: Calculated visitors + Conversion rate */}
+              {config?.category === 'page' && (
+                <>
+                  <div className="space-y-2 mb-3">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                      Visitantes (calculado)
+                    </Label>
+                    <div className="p-2.5 bg-muted/50 rounded-md border border-border">
+                      <span className="text-lg font-bold text-foreground">
+                        {formData.calculatedVisitors.toLocaleString()}
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-2">pessoas</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Calculado automaticamente baseado nas conexões anteriores
+                    </p>
+                  </div>
+                  
                   <div className="space-y-2 mb-3">
                     <Label htmlFor="node-conversion-rate" className="text-sm font-medium flex items-center gap-2">
                       <Percent className="w-3.5 h-3.5 text-muted-foreground" />
@@ -468,30 +617,75 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
                       />
                     </div>
                     <p className="text-[10px] text-muted-foreground">
-                      {config?.category === 'page' 
-                        ? 'Percentual de visitantes que avançam para a próxima etapa' 
-                        : 'Taxa de conversão deste evento'}
+                      Percentual de visitantes que avançam para a próxima etapa
                     </p>
                   </div>
                   
-                  {config?.category === 'page' && (
-                    <div className="space-y-2">
-                      <Label htmlFor="node-cost-page" className="text-sm font-medium">
-                        Custo da Página (R$)
-                      </Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="node-cost-page" className="text-sm font-medium">
+                      Custo da Página (R$)
+                    </Label>
+                    <Input
+                      id="node-cost-page"
+                      type="number"
+                      value={formData.cost}
+                      onChange={(e) => handleInputChange('cost', parseFloat(e.target.value) || 0)}
+                      placeholder="Ex: 0"
+                      disabled={isLocked}
+                    />
+                  </div>
+                </>
+              )}
+              
+              {/* Events: Calculated visitors + Utilization rate */}
+              {config?.category === 'event' && (
+                <>
+                  <div className="space-y-2 mb-3">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                      Pessoas (calculado)
+                    </Label>
+                    <div className="p-2.5 bg-muted/50 rounded-md border border-border">
+                      <span className="text-lg font-bold text-foreground">
+                        {formData.calculatedVisitors.toLocaleString()}
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-2">pessoas</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Calculado automaticamente baseado nas conexões anteriores
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2 mb-3">
+                    <Label htmlFor="node-utilization-rate-event" className="text-sm font-medium flex items-center gap-2">
+                      <Percent className="w-3.5 h-3.5 text-muted-foreground" />
+                      Taxa de Aproveitamento (%)
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[formData.utilizationRate]}
+                        onValueChange={(value) => handleInputChange('utilizationRate', value[0])}
+                        min={0}
+                        max={100}
+                        step={1}
+                        disabled={isLocked}
+                        className="flex-1"
+                      />
                       <Input
-                        id="node-cost-page"
+                        id="node-utilization-rate-event"
                         type="number"
-                        value={formData.cost}
-                        onChange={(e) => handleInputChange('cost', parseFloat(e.target.value) || 0)}
-                        placeholder="Ex: 100"
+                        value={formData.utilizationRate}
+                        onChange={(e) => handleInputChange('utilizationRate', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                        className="w-16 text-center"
+                        min={0}
+                        max={100}
                         disabled={isLocked}
                       />
-                      <p className="text-[10px] text-muted-foreground">
-                        Custo operacional da página (hosting, ferramentas, etc.)
-                      </p>
                     </div>
-                  )}
+                    <p className="text-[10px] text-muted-foreground">
+                      Percentual de aproveitamento deste evento (padrão: 60%)
+                    </p>
+                  </div>
                 </>
               )}
             </div>
