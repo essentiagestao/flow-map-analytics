@@ -4,10 +4,11 @@
 export interface DefaultMetrics {
   visitors?: number;
   conversionRate?: number;
+  utilizationRate?: number; // Taxa de aproveitamento para eventos
   cost?: number;
 }
 
-// Traffic sources - default visitor counts
+// Traffic sources - default visitor counts (manual input)
 export const trafficDefaults: Record<string, DefaultMetrics> = {
   facebook: { visitors: 1000, cost: 500 },
   instagram: { visitors: 800, cost: 400 },
@@ -33,21 +34,27 @@ export const pageDefaults: Record<string, DefaultMetrics> = {
   downsell: { conversionRate: 35, cost: 0 },
 };
 
-// Communication - default recipient counts
+// Communication - utilization rate (calculated visitors + rate)
 export const communicationDefaults: Record<string, DefaultMetrics> = {
-  email: { visitors: 500, cost: 50 },
-  sequence: { visitors: 400, cost: 100 },
-  sms: { visitors: 300, cost: 150 },
-  whatsapp: { visitors: 350, cost: 75 },
+  email: { utilizationRate: 60, cost: 50 },
+  sequence: { utilizationRate: 55, cost: 100 },
+  sms: { utilizationRate: 70, cost: 150 },
+  whatsapp: { utilizationRate: 75, cost: 75 },
 };
 
-// Events - default conversion rates (%)
+// Events - utilization rate (taxa de aproveitamento, default 60%)
 export const eventDefaults: Record<string, DefaultMetrics> = {
-  lead: { conversionRate: 100, cost: 0 },
-  customer: { conversionRate: 100, cost: 0 },
-  upsell: { conversionRate: 30, cost: 0 },
-  lost: { conversionRate: 100, cost: 0 },
-  segment: { conversionRate: 80, cost: 0 },
+  lead: { utilizationRate: 100, cost: 0 },
+  customer: { utilizationRate: 100, cost: 0 },
+  upsell: { utilizationRate: 30, cost: 0 },
+  lost: { utilizationRate: 100, cost: 0 },
+  segment: { utilizationRate: 60, cost: 0 },
+};
+
+// Default split ratios when a node has multiple outputs
+export const defaultSplitRatios = {
+  positive: 60, // Conversões, ações positivas
+  negative: 40, // Ações negativas, abandono
 };
 
 export const getDefaultMetrics = (nodeType: string, category: string): DefaultMetrics => {
@@ -57,10 +64,10 @@ export const getDefaultMetrics = (nodeType: string, category: string): DefaultMe
     case 'page':
       return pageDefaults[nodeType] || { conversionRate: 30, cost: 0 };
     case 'communication':
-      return communicationDefaults[nodeType] || { visitors: 300, cost: 50 };
+      return communicationDefaults[nodeType] || { utilizationRate: 60, cost: 50 };
     case 'event':
-      return eventDefaults[nodeType] || { conversionRate: 50, cost: 0 };
+      return eventDefaults[nodeType] || { utilizationRate: 60, cost: 0 };
     default:
-      return { conversionRate: 50 };
+      return { utilizationRate: 60 };
   }
 };
