@@ -25,8 +25,12 @@ export const ConversionFunnelPanel = () => {
   const [isMinimized, setIsMinimized] = useState(false);
   const { nodes, edges } = useFunnelStore();
 
-  // Calculate incoming visitors for a node based on edges
-  const calculateIncomingVisitors = (nodeId: string, visitedInCalc: Set<string>): number => {
+  // Calculate incoming visitors for a node based on edges (recursive)
+  const calculateIncomingVisitors = (nodeId: string, visited: Set<string> = new Set()): number => {
+    // Prevent infinite loops
+    if (visited.has(nodeId)) return 0;
+    visited.add(nodeId);
+    
     const incomingEdges = edges.filter(e => e.target === nodeId);
     if (incomingEdges.length === 0) return 0;
     
@@ -34,31 +38,30 @@ export const ConversionFunnelPanel = () => {
     
     incomingEdges.forEach(edge => {
       const sourceNode = nodes.find(n => n.id === edge.source);
-      if (!sourceNode || visitedInCalc.has(edge.source)) return;
+      if (!sourceNode) return;
       
       const sourceConfig = getNodeConfig(sourceNode.data?.nodeType as string);
       const sourceCategory = sourceConfig?.category;
       
-      // Get source node's visitors
-      let sourceVisitors = 0;
+      // Get source node's base visitors (before applying its own rate)
+      let sourceBaseVisitors = 0;
+      
       if (sourceCategory === 'traffic') {
-        sourceVisitors = Number(sourceNode.data?.visitors || 0);
+        // Traffic nodes have manual visitor input
+        sourceBaseVisitors = Number(sourceNode.data?.visitors || 0);
       } else {
-        // For other nodes, recursively calculate if needed
-        const prevVisited = new Set(visitedInCalc);
-        prevVisited.add(nodeId);
-        sourceVisitors = calculateIncomingVisitors(edge.source, prevVisited);
-        if (sourceVisitors === 0) {
-          sourceVisitors = Number(sourceNode.data?.calculatedVisitors || sourceNode.data?.visitors || 0);
-        }
+        // Other nodes: recursively calculate their incoming visitors
+        sourceBaseVisitors = calculateIncomingVisitors(edge.source, new Set(visited));
       }
       
-      // Apply source node's rate
+      // Apply source node's rate to calculate what flows OUT of that node
       const sourceRate = Number(
         sourceNode.data?.conversionRate || 
         sourceNode.data?.utilizationRate || 
         100
       );
+      
+      let outputVisitors = Math.round(sourceBaseVisitors * (sourceRate / 100));
       
       // Handle split when source has multiple outgoing edges
       const sourceOutgoingEdges = edges.filter(e => e.source === edge.source);
@@ -66,10 +69,10 @@ export const ConversionFunnelPanel = () => {
         const splitRatio = Number(sourceNode.data?.splitRatio || 60);
         const edgeIndex = sourceOutgoingEdges.findIndex(e => e.id === edge.id);
         const ratio = edgeIndex === 0 ? splitRatio : (100 - splitRatio) / (sourceOutgoingEdges.length - 1);
-        totalVisitors += Math.round(sourceVisitors * (sourceRate / 100) * (ratio / 100));
-      } else {
-        totalVisitors += Math.round(sourceVisitors * (sourceRate / 100));
+        outputVisitors = Math.round(outputVisitors * (ratio / 100));
       }
+      
+      totalVisitors += outputVisitors;
     });
     
     return totalVisitors;
@@ -99,27 +102,28 @@ export const ConversionFunnelPanel = () => {
       
       let visitors = 0;
       let rate = 0;
+      let incomingVisitors = 0;
       
       // Traffic: Use direct visitor count (manual input)
       if (category === 'traffic') {
         visitors = (node.data?.visitors as number) || 0;
+        incomingVisitors = visitors; // For display purposes
         rate = 100;
       } 
       // Communication & Events: Use utilizationRate
       else if (category === 'communication' || category === 'event') {
-        const incomingVisitors = calculateIncomingVisitors(nodeId, new Set());
+        incomingVisitors = calculateIncomingVisitors(nodeId);
         rate = (node.data?.utilizationRate as number) || 60;
-        visitors = incomingVisitors > 0 ? Math.round(incomingVisitors * (rate / 100)) : 0;
+        visitors = incomingVisitors; // Show incoming visitors, rate affects what flows OUT
       }
       // Pages: Use conversionRate
       else {
-        const incomingVisitors = calculateIncomingVisitors(nodeId, new Set());
+        incomingVisitors = calculateIncomingVisitors(nodeId);
         rate = (node.data?.conversionRate as number) || 0;
-        visitors = incomingVisitors > 0 ? Math.round(incomingVisitors * (rate / 100)) : 0;
+        visitors = incomingVisitors; // Show incoming visitors, rate affects what flows OUT
       }
       
-      const incomingVisitors = calculateIncomingVisitors(nodeId, new Set());
-      const lostVisitors = incomingVisitors > visitors ? incomingVisitors - visitors : 0;
+      const lostVisitors = Math.round(incomingVisitors * ((100 - rate) / 100));
       
       orderedSteps.push({
         id: node.id,

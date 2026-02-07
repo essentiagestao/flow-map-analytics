@@ -58,8 +58,12 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
 
   const [isLocked, setIsLocked] = useState(false);
 
-  // Calculate visitors for nodes that receive from previous nodes
-  const calculateIncomingVisitors = (nodeId: string): number => {
+  // Calculate visitors for nodes that receive from previous nodes (recursive)
+  const calculateIncomingVisitors = (nodeId: string, visited: Set<string> = new Set()): number => {
+    // Prevent infinite loops
+    if (visited.has(nodeId)) return 0;
+    visited.add(nodeId);
+    
     const incomingEdges = edges.filter(e => e.target === nodeId);
     if (incomingEdges.length === 0) return 0;
     
@@ -72,37 +76,36 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
       const sourceConfig = getNodeConfig(String(sourceNode.data?.nodeType));
       const sourceCategory = sourceConfig?.category;
       
-      // Get source node's output visitors
-      let sourceVisitors = 0;
+      // Get source node's base visitors (before applying its own rate)
+      let sourceBaseVisitors = 0;
       
       if (sourceCategory === 'traffic') {
-        sourceVisitors = Number(sourceNode.data?.visitors || 0);
+        // Traffic nodes have manual visitor input
+        sourceBaseVisitors = Number(sourceNode.data?.visitors || 0);
       } else {
-        // For other nodes, use their calculated visitors
-        sourceVisitors = Number(sourceNode.data?.calculatedVisitors || sourceNode.data?.visitors || 0);
+        // Other nodes: recursively calculate their incoming visitors
+        sourceBaseVisitors = calculateIncomingVisitors(edge.source, new Set(visited));
       }
       
-      // Apply source node's rate to calculate what flows out
+      // Apply source node's rate to calculate what flows OUT of that node
       const sourceRate = Number(
         sourceNode.data?.conversionRate || 
         sourceNode.data?.utilizationRate || 
         100
       );
       
+      let outputVisitors = Math.round(sourceBaseVisitors * (sourceRate / 100));
+      
       // Check if source has multiple outgoing edges (split scenario)
       const sourceOutgoingEdges = edges.filter(e => e.source === edge.source);
       if (sourceOutgoingEdges.length > 1) {
-        // Get split ratio for this specific edge, or use default
         const splitRatio = Number(sourceNode.data?.splitRatio || 60);
-        // Simple split: first edge gets splitRatio%, others split the rest
         const edgeIndex = sourceOutgoingEdges.findIndex(e => e.id === edge.id);
         const ratio = edgeIndex === 0 ? splitRatio : (100 - splitRatio) / (sourceOutgoingEdges.length - 1);
-        sourceVisitors = Math.round(sourceVisitors * (sourceRate / 100) * (ratio / 100));
-      } else {
-        sourceVisitors = Math.round(sourceVisitors * (sourceRate / 100));
+        outputVisitors = Math.round(outputVisitors * (ratio / 100));
       }
       
-      totalVisitors += sourceVisitors;
+      totalVisitors += outputVisitors;
     });
     
     return totalVisitors;
