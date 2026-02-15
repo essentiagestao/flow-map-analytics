@@ -277,6 +277,56 @@ export const eventNodes: NodeTypeConfig[] = [
     icon: 'FaFilter',
     description: 'Segmentação'
   },
+  {
+    id: 'crm',
+    label: 'CRM',
+    category: 'event',
+    color: '#3B82F6',
+    bgColor: '#DBEAFE',
+    borderColor: '#3B82F6',
+    icon: 'FaDatabase',
+    description: 'Entrada no CRM'
+  },
+  {
+    id: 'comercial',
+    label: 'Comercial',
+    category: 'event',
+    color: '#0EA5E9',
+    bgColor: '#E0F2FE',
+    borderColor: '#0EA5E9',
+    icon: 'FaPhone',
+    description: 'Contato comercial'
+  },
+  {
+    id: 'proposta',
+    label: 'Proposta Comercial',
+    category: 'event',
+    color: '#F97316',
+    bgColor: '#FFF7ED',
+    borderColor: '#F97316',
+    icon: 'FaFileContract',
+    description: 'Envio de proposta comercial'
+  },
+  {
+    id: 'agendamento',
+    label: 'Agendamento',
+    category: 'event',
+    color: '#6366F1',
+    bgColor: '#EEF2FF',
+    borderColor: '#6366F1',
+    icon: 'FaCalendarCheck',
+    description: 'Reunião ou visita agendada'
+  },
+  {
+    id: 'visita',
+    label: 'Visita Presencial',
+    category: 'event',
+    color: '#14B8A6',
+    bgColor: '#CCFBF1',
+    borderColor: '#14B8A6',
+    icon: 'FaMapMarkerAlt',
+    description: 'Visita presencial ao cliente'
+  },
 ];
 
 export const allNodeTypes = [

@@ -14,6 +14,8 @@ import { DeleteConfirmDialog, shouldShowDeleteConfirm } from './DeleteConfirmDia
 import { OnboardingOverlay } from './Onboarding/OnboardingOverlay';
 import { ExportDialog } from './Export/ExportDialog';
 import { TemplateSelector } from './TemplateSelector';
+import { SavedFunnelsDialog } from './SavedFunnelsDialog';
+import { useSavedFunnelsStore } from '@/lib/store/savedFunnelsStore';
 
 export const EditorShell = () => {
   const { 
@@ -43,6 +45,7 @@ export const EditorShell = () => {
   const [pendingDeleteCount, setPendingDeleteCount] = useState(0);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [savedFunnelsOpen, setSavedFunnelsOpen] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -185,6 +188,7 @@ export const EditorShell = () => {
         onOpenShortcuts={() => setShortcutsOpen(true)} 
         onOpenExport={() => setExportDialogOpen(true)}
         onOpenTemplates={() => setTemplatesOpen(true)}
+        onOpenSavedFunnels={() => setSavedFunnelsOpen(true)}
       />
       
       <div className="flex-1 flex overflow-hidden">
@@ -225,6 +229,11 @@ export const EditorShell = () => {
       <TemplateSelector
         open={templatesOpen}
         onOpenChange={setTemplatesOpen}
+      />
+      
+      <SavedFunnelsDialog
+        open={savedFunnelsOpen}
+        onOpenChange={setSavedFunnelsOpen}
       />
       
       {/* Onboarding for first-time users */}

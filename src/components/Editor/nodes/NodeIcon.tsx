@@ -24,6 +24,11 @@ import {
   FaArrowUp,
   FaTimes,
   FaFilter,
+  FaDatabase,
+  FaPhone,
+  FaFileContract,
+  FaCalendarCheck,
+  FaMapMarkerAlt,
 } from 'react-icons/fa';
 
 interface IconProps {
@@ -57,6 +62,11 @@ const iconMap: Record<string, React.ComponentType<IconProps>> = {
   FaArrowUp,
   FaTimes,
   FaFilter,
+  FaDatabase,
+  FaPhone,
+  FaFileContract,
+  FaCalendarCheck,
+  FaMapMarkerAlt,
 };
 
 interface NodeIconProps {
