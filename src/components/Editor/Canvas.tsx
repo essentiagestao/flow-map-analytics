@@ -26,6 +26,7 @@ import { useFunnelStore } from '@/lib/store/funnelStore';
 import { AlignmentToolbar } from './AlignmentToolbar';
 import { ConversionFunnelPanel } from './ConversionFunnelPanel';
 import { getDefaultMetrics } from '@/lib/utils/defaultMetrics';
+import { recalculateSplitRatios } from '@/lib/utils/splitRatioUtils';
 import { 
   TrafficNode, 
   PageNode, 
@@ -61,12 +62,18 @@ const CustomEdge = ({
   style = {},
   data,
   selected,
+  source,
 }: EdgeProps) => {
-  const { selectedEdgeId, setSelectedEdgeId } = useFunnelStore();
+  const { selectedEdgeId, setSelectedEdgeId, edges } = useFunnelStore();
   const isSelected = selected || selectedEdgeId === id;
   const isDashed = data?.style === 'dashed';
   
-  const [edgePath] = getSmoothStepPath({
+  // Check if source has multiple outgoing edges
+  const sourceOutgoing = edges.filter(e => e.source === source);
+  const hasSplit = sourceOutgoing.length > 1;
+  const splitPercent = Number(data?.splitPercent || 100);
+  
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
     sourcePosition,
@@ -103,6 +110,22 @@ const CustomEdge = ({
           setSelectedEdgeId(id);
         }}
       />
+      {/* Split percentage label */}
+      {hasSplit && (
+        <foreignObject
+          x={labelX - 16}
+          y={labelY - 10}
+          width={32}
+          height={20}
+          className="pointer-events-none"
+        >
+          <div className="flex items-center justify-center w-full h-full">
+            <span className="text-[9px] font-bold bg-card border border-border rounded px-1 py-0.5 text-foreground shadow-sm">
+              {splitPercent}%
+            </span>
+          </div>
+        </foreignObject>
+      )}
     </>
   );
 };
@@ -287,10 +310,17 @@ const CanvasComponent = () => {
       source: params.source!,
       target: params.target!,
       type: 'custom',
-      data: { style: 'solid' },
+      data: { style: 'solid', splitPercent: 100 },
     };
     storeAddEdge(newEdge);
-  }, [storeAddEdge]);
+    
+    // Recalculate split ratios for all outgoing edges of the source node
+    setTimeout(() => {
+      const currentEdges = useFunnelStore.getState().edges;
+      const updated = recalculateSplitRatios(currentEdges, params.source!);
+      setStoreEdges(updated);
+    }, 50);
+  }, [storeAddEdge, setStoreEdges]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();

@@ -66,10 +66,8 @@ export const ConversionFunnelPanel = () => {
       // Handle split when source has multiple outgoing edges
       const sourceOutgoingEdges = edges.filter(e => e.source === edge.source);
       if (sourceOutgoingEdges.length > 1) {
-        const splitRatio = Number(sourceNode.data?.splitRatio || 60);
-        const edgeIndex = sourceOutgoingEdges.findIndex(e => e.id === edge.id);
-        const ratio = edgeIndex === 0 ? splitRatio : (100 - splitRatio) / (sourceOutgoingEdges.length - 1);
-        outputVisitors = Math.round(outputVisitors * (ratio / 100));
+        const edgeSplitPercent = Number(edge.data?.splitPercent || (100 / sourceOutgoingEdges.length));
+        outputVisitors = Math.round(outputVisitors * (edgeSplitPercent / 100));
       }
       
       totalVisitors += outputVisitors;
