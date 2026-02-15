@@ -116,15 +116,15 @@ const CustomEdge = ({
       {/* Split percentage label */}
       {hasSplit && (
         <foreignObject
-          x={labelX - 16}
+          x={labelX - 20}
           y={labelY - 10}
-          width={32}
+          width={40}
           height={20}
           className="pointer-events-none"
         >
           <div className="flex items-center justify-center w-full h-full">
             <span className="text-[9px] font-bold bg-card border border-border rounded px-1 py-0.5 text-foreground shadow-sm">
-              {splitPercent}%
+              {data?.simultaneousDistribution ? '100%' : `${splitPercent}%`}
             </span>
           </div>
         </foreignObject>
@@ -478,21 +478,21 @@ const CanvasComponent = () => {
       <AlignmentToolbar />
       <ConversionFunnelPanel />
       
-      {/* Magnetic mode toggle */}
+      {/* Magnetic mode toggle - bottom left, always visible */}
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant={magneticMode ? 'default' : 'outline'}
-              size="sm"
-              className="absolute top-3 right-3 z-10 gap-1.5 shadow-lg"
+              size="default"
+              className="absolute bottom-6 left-14 z-10 gap-2 shadow-xl border-2"
               onClick={() => setMagneticMode(!magneticMode)}
             >
-              <Magnet className="w-4 h-4" />
-              <span className="text-xs">{magneticMode ? 'Magnético' : 'Manual'}</span>
+              <Magnet className="w-5 h-5" />
+              <span className="text-sm font-medium">{magneticMode ? 'Magnético' : 'Manual'}</span>
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="left">
+          <TooltipContent side="top">
             <p>{magneticMode ? 'Auto-conecta ao soltar perto de outro nó' : 'Conexões manuais apenas'}</p>
           </TooltipContent>
         </Tooltip>

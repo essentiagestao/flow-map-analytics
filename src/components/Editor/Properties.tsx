@@ -11,9 +11,10 @@ import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFunnelStore } from '@/lib/store/funnelStore';
 import { getNodeConfig, NodeCategory } from './nodes';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Copy, Trash2, Lock, Unlock, Layers, Move, Palette, Settings2, ArrowRight, Users, Percent, BarChart3, GitBranch } from 'lucide-react';
 import { toast } from 'sonner';
-import { updateEdgeSplitPercent, recalculateSplitRatios } from '@/lib/utils/splitRatioUtils';
+import { updateEdgeSplitPercent, recalculateSplitRatios, isSimultaneousDistribution, toggleSimultaneousDistribution } from '@/lib/utils/splitRatioUtils';
 
 interface PropertiesProps {
   onDelete?: () => void;
@@ -100,8 +101,12 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
       // Check if source has multiple outgoing edges (split scenario)
       const sourceOutgoingEdges = edges.filter(e => e.source === edge.source);
       if (sourceOutgoingEdges.length > 1) {
-        const edgeSplitPercent = Number(edge.data?.splitPercent || (100 / sourceOutgoingEdges.length));
-        outputVisitors = Math.round(outputVisitors * (edgeSplitPercent / 100));
+        const isSimultaneous = edge.data?.simultaneousDistribution === true;
+        if (!isSimultaneous) {
+          const edgeSplitPercent = Number(edge.data?.splitPercent || (100 / sourceOutgoingEdges.length));
+          outputVisitors = Math.round(outputVisitors * (edgeSplitPercent / 100));
+        }
+        // If simultaneous, 100% flows through each path
       }
       
       totalVisitors += outputVisitors;
@@ -304,62 +309,91 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
           </div>
 
           {/* Split Ratio Controls */}
-          {hasSplit && (
-            <div className="space-y-3 pt-2 border-t border-border">
-              <div className="flex items-center gap-2">
-                <GitBranch className="w-4 h-4 text-muted-foreground" />
-                <Label className="text-sm font-semibold">Distribuição de Saída</Label>
-              </div>
-              <p className="text-[10px] text-muted-foreground">
-                Defina como as pessoas são distribuídas entre as {siblingEdges.length} saídas de &quot;{String(sourceNode?.data?.label)}&quot;
-              </p>
-              
-              {siblingEdges.map((sibEdge) => {
-                const targetNode = nodes.find(n => n.id === sibEdge.target);
-                const percent = Number(sibEdge.data?.splitPercent || Math.floor(100 / siblingEdges.length));
-                const isCurrentEdge = sibEdge.id === selectedEdge.id;
+          {hasSplit && (() => {
+            const isSimultaneous = isSimultaneousDistribution(edges, selectedEdge.source);
+            
+            return (
+              <div className="space-y-3 pt-2 border-t border-border">
+                <div className="flex items-center gap-2">
+                  <GitBranch className="w-4 h-4 text-muted-foreground" />
+                  <Label className="text-sm font-semibold">Distribuição de Saída</Label>
+                </div>
                 
-                return (
-                  <div 
-                    key={sibEdge.id} 
-                    className={`p-2.5 rounded-lg border ${isCurrentEdge ? 'border-primary bg-primary/5' : 'border-border bg-muted/30'}`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-medium text-foreground truncate max-w-[140px]">
-                        → {String(targetNode?.data?.label || sibEdge.target)}
-                      </span>
-                      <span className="text-xs font-bold text-foreground">{percent}%</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Slider
-                        value={[percent]}
-                        onValueChange={(value) => {
-                          const updated = updateEdgeSplitPercent(edges, sibEdge.id, value[0]);
-                          useFunnelStore.getState().setEdges(updated);
-                        }}
-                        min={1}
-                        max={99}
-                        step={1}
-                        className="flex-1"
-                      />
-                      <Input
-                        type="number"
-                        value={percent}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 1;
-                          const updated = updateEdgeSplitPercent(edges, sibEdge.id, val);
-                          useFunnelStore.getState().setEdges(updated);
-                        }}
-                        className="w-14 text-center text-xs h-7"
-                        min={1}
-                        max={99}
-                      />
-                    </div>
+                {/* Simultaneous distribution toggle */}
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/30 border border-border">
+                  <Checkbox
+                    id="simultaneous"
+                    checked={isSimultaneous}
+                    onCheckedChange={(checked) => {
+                      const updated = toggleSimultaneousDistribution(edges, selectedEdge.source, !!checked);
+                      useFunnelStore.getState().setEdges(updated);
+                    }}
+                  />
+                  <div className="flex-1">
+                    <Label htmlFor="simultaneous" className="text-xs font-medium cursor-pointer">
+                      Distribuição simultânea
+                    </Label>
+                    <p className="text-[10px] text-muted-foreground">
+                      Envia 100% do volume para todos os caminhos
+                    </p>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                </div>
+
+                {!isSimultaneous && (
+                  <>
+                    <p className="text-[10px] text-muted-foreground">
+                      Defina como as pessoas são distribuídas entre as {siblingEdges.length} saídas de &quot;{String(sourceNode?.data?.label)}&quot;
+                    </p>
+                    
+                    {siblingEdges.map((sibEdge) => {
+                      const targetNode = nodes.find(n => n.id === sibEdge.target);
+                      const percent = Number(sibEdge.data?.splitPercent || Math.floor(100 / siblingEdges.length));
+                      const isCurrentEdge = sibEdge.id === selectedEdge.id;
+                      
+                      return (
+                        <div 
+                          key={sibEdge.id} 
+                          className={`p-2.5 rounded-lg border ${isCurrentEdge ? 'border-primary bg-primary/5' : 'border-border bg-muted/30'}`}
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-medium text-foreground truncate max-w-[140px]">
+                              → {String(targetNode?.data?.label || sibEdge.target)}
+                            </span>
+                            <span className="text-xs font-bold text-foreground">{percent}%</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Slider
+                              value={[percent]}
+                              onValueChange={(value) => {
+                                const updated = updateEdgeSplitPercent(edges, sibEdge.id, value[0]);
+                                useFunnelStore.getState().setEdges(updated);
+                              }}
+                              min={1}
+                              max={99}
+                              step={1}
+                              className="flex-1"
+                            />
+                            <Input
+                              type="number"
+                              value={percent}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 1;
+                                const updated = updateEdgeSplitPercent(edges, sibEdge.id, val);
+                                useFunnelStore.getState().setEdges(updated);
+                              }}
+                              className="w-14 text-center text-xs h-7"
+                              min={1}
+                              max={99}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           <div className="pt-4">
             <Button 
