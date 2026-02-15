@@ -13,10 +13,12 @@ import {
   RotateCw,
   Keyboard,
   LayoutTemplate,
+  Save,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useFunnelStore } from '@/lib/store/funnelStore';
+import { useSavedFunnelsStore } from '@/lib/store/savedFunnelsStore';
 import { getSampleFunnel } from '@/lib/utils/sampleData';
 import { importFromJSON } from '@/lib/utils/exportImport';
 import { toast } from 'sonner';
@@ -31,9 +33,10 @@ interface TopbarProps {
   onOpenShortcuts?: () => void;
   onOpenExport?: () => void;
   onOpenTemplates?: () => void;
+  onOpenSavedFunnels?: () => void;
 }
 
-export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpenExport, onOpenTemplates }: TopbarProps) => {
+export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpenExport, onOpenTemplates, onOpenSavedFunnels }: TopbarProps) => {
   const { 
     clear, 
     saveToLocal, 
@@ -52,6 +55,7 @@ export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpen
     setLastSaved,
     setIsSaving,
   } = useFunnelStore();
+  const { currentFunnelName } = useSavedFunnelsStore();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -134,7 +138,7 @@ export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpen
   return (
     <div className="h-16 bg-card border-b border-border flex items-center justify-between px-6">
       <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold text-foreground">Editor de Funis</h1>
+        <h1 className="text-xl font-semibold text-foreground">{currentFunnelName}</h1>
         <SaveIndicator dirty={dirty} lastSaved={lastSaved} isSaving={isSaving} />
       </div>
       
@@ -148,6 +152,16 @@ export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpen
         >
           <File className="w-4 h-4" />
           Novo
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={onOpenSavedFunnels}
+          title="Meus funis salvos"
+        >
+          <FolderOpen className="w-4 h-4" />
+          Meus Funis
         </Button>
         
         <Button 

@@ -213,6 +213,7 @@ export const ConversionFunnelPanel = () => {
 
   return (
     <motion.div
+      data-conversion-panel
       initial={{ x: 100, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       className={cn(

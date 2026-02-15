@@ -49,6 +49,11 @@ export const eventDefaults: Record<string, DefaultMetrics> = {
   upsell: { utilizationRate: 30, cost: 0 },
   lost: { utilizationRate: 100, cost: 0 },
   segment: { utilizationRate: 60, cost: 0 },
+  crm: { utilizationRate: 90, cost: 0 },
+  comercial: { utilizationRate: 50, cost: 0 },
+  proposta: { utilizationRate: 40, cost: 0 },
+  agendamento: { utilizationRate: 60, cost: 0 },
+  visita: { utilizationRate: 70, cost: 0 },
 };
 
 // Default split ratios when a node has multiple outputs
