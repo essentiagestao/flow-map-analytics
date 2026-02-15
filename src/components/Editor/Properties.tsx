@@ -11,8 +11,9 @@ import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFunnelStore } from '@/lib/store/funnelStore';
 import { getNodeConfig, NodeCategory } from './nodes';
-import { Copy, Trash2, Lock, Unlock, Layers, Move, Palette, Settings2, ArrowRight, Users, Percent, BarChart3 } from 'lucide-react';
+import { Copy, Trash2, Lock, Unlock, Layers, Move, Palette, Settings2, ArrowRight, Users, Percent, BarChart3, GitBranch } from 'lucide-react';
 import { toast } from 'sonner';
+import { updateEdgeSplitPercent, recalculateSplitRatios } from '@/lib/utils/splitRatioUtils';
 
 interface PropertiesProps {
   onDelete?: () => void;
@@ -99,10 +100,8 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
       // Check if source has multiple outgoing edges (split scenario)
       const sourceOutgoingEdges = edges.filter(e => e.source === edge.source);
       if (sourceOutgoingEdges.length > 1) {
-        const splitRatio = Number(sourceNode.data?.splitRatio || 60);
-        const edgeIndex = sourceOutgoingEdges.findIndex(e => e.id === edge.id);
-        const ratio = edgeIndex === 0 ? splitRatio : (100 - splitRatio) / (sourceOutgoingEdges.length - 1);
-        outputVisitors = Math.round(outputVisitors * (ratio / 100));
+        const edgeSplitPercent = Number(edge.data?.splitPercent || (100 / sourceOutgoingEdges.length));
+        outputVisitors = Math.round(outputVisitors * (edgeSplitPercent / 100));
       }
       
       totalVisitors += outputVisitors;
@@ -249,6 +248,11 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
   if (selectedEdge) {
     const edgeLabels = getEdgeNodeLabels();
     const edgeStyle = (selectedEdge.data?.style as string) || 'solid';
+    
+    // Get sibling edges (same source) for split ratio editing
+    const sourceNode = nodes.find(n => n.id === selectedEdge.source);
+    const siblingEdges = edges.filter(e => e.source === selectedEdge.source);
+    const hasSplit = siblingEdges.length > 1;
 
     return (
       <div className="p-4 h-full overflow-y-auto">
@@ -299,13 +303,78 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
             </Select>
           </div>
 
+          {/* Split Ratio Controls */}
+          {hasSplit && (
+            <div className="space-y-3 pt-2 border-t border-border">
+              <div className="flex items-center gap-2">
+                <GitBranch className="w-4 h-4 text-muted-foreground" />
+                <Label className="text-sm font-semibold">Distribuição de Saída</Label>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Defina como as pessoas são distribuídas entre as {siblingEdges.length} saídas de &quot;{String(sourceNode?.data?.label)}&quot;
+              </p>
+              
+              {siblingEdges.map((sibEdge) => {
+                const targetNode = nodes.find(n => n.id === sibEdge.target);
+                const percent = Number(sibEdge.data?.splitPercent || Math.floor(100 / siblingEdges.length));
+                const isCurrentEdge = sibEdge.id === selectedEdge.id;
+                
+                return (
+                  <div 
+                    key={sibEdge.id} 
+                    className={`p-2.5 rounded-lg border ${isCurrentEdge ? 'border-primary bg-primary/5' : 'border-border bg-muted/30'}`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-medium text-foreground truncate max-w-[140px]">
+                        → {String(targetNode?.data?.label || sibEdge.target)}
+                      </span>
+                      <span className="text-xs font-bold text-foreground">{percent}%</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[percent]}
+                        onValueChange={(value) => {
+                          const updated = updateEdgeSplitPercent(edges, sibEdge.id, value[0]);
+                          useFunnelStore.getState().setEdges(updated);
+                        }}
+                        min={1}
+                        max={99}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        value={percent}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 1;
+                          const updated = updateEdgeSplitPercent(edges, sibEdge.id, val);
+                          useFunnelStore.getState().setEdges(updated);
+                        }}
+                        className="w-14 text-center text-xs h-7"
+                        min={1}
+                        max={99}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <div className="pt-4">
             <Button 
               variant="destructive" 
               onClick={() => {
+                const sourceId = selectedEdge.source;
                 removeEdge(selectedEdge.id);
                 setSelectedEdgeId(null);
                 toast.success('Conexão removida');
+                // Recalculate split ratios for remaining edges
+                setTimeout(() => {
+                  const currentEdges = useFunnelStore.getState().edges;
+                  const updated = recalculateSplitRatios(currentEdges, sourceId);
+                  useFunnelStore.getState().setEdges(updated);
+                }, 50);
               }}
               className="w-full"
             >
@@ -318,7 +387,10 @@ export const Properties = ({ onDelete }: PropertiesProps) => {
         <div className="mt-4 p-3 bg-muted rounded-lg">
           <h4 className="text-sm font-medium mb-2 text-foreground">Dica</h4>
           <p className="text-xs text-muted-foreground">
-            Para criar novas conexões, passe o mouse sobre um nó e arraste a partir dos pontos de conexão que aparecem nas laterais.
+            {hasSplit 
+              ? 'Ajuste os percentuais para controlar como os visitantes são distribuídos entre as saídas.'
+              : 'Para criar novas conexões, passe o mouse sobre um nó e arraste a partir dos pontos de conexão que aparecem nas laterais.'
+            }
           </p>
         </div>
       </div>
