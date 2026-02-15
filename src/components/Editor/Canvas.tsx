@@ -21,6 +21,9 @@ import {
   getSmoothStepPath,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { Magnet } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
 import { useFunnelStore } from '@/lib/store/funnelStore';
 import { AlignmentToolbar } from './AlignmentToolbar';
@@ -156,6 +159,8 @@ const CanvasComponent = () => {
     setEdges: setStoreEdges,
     updateNode,
     pushHistory,
+    magneticMode,
+    setMagneticMode,
   } = useFunnelStore();
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -327,6 +332,29 @@ const CanvasComponent = () => {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
+  // Find nearest node to a position for magnetic connect
+  const findNearestNode = useCallback((position: { x: number; y: number }, excludeId: string) => {
+    const MAGNETIC_DISTANCE = 250; // pixels threshold
+    let nearest: Node | null = null;
+    let minDist = MAGNETIC_DISTANCE;
+
+    for (const node of storeNodes) {
+      if (node.id === excludeId) continue;
+      const nodeW = (node.data?.width as number) || 100;
+      const nodeH = (node.data?.height as number) || 60;
+      const nodeCenterX = node.position.x + nodeW / 2;
+      const nodeCenterY = node.position.y + nodeH / 2;
+      const dist = Math.sqrt(
+        Math.pow(position.x - nodeCenterX, 2) + Math.pow(position.y - nodeCenterY, 2)
+      );
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = node;
+      }
+    }
+    return nearest;
+  }, [storeNodes]);
+
   // Handle drop from palette (new nodes)
   const onDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -359,8 +387,9 @@ const CanvasComponent = () => {
     const size = defaultSizes[category];
     const defaultMetrics = getDefaultMetrics(nodeType, category);
 
+    const newNodeId = `${nodeType}-${Date.now()}`;
     const newNode: Node = {
-      id: `${nodeType}-${Date.now()}`,
+      id: newNodeId,
       type: reactFlowNodeType,
       position,
       data: {
@@ -373,11 +402,37 @@ const CanvasComponent = () => {
       },
     };
 
-    // Add to store - will sync to local state via useEffect
+    // Add to store
     addNode(newNode);
-    // Select the newly added node
-    setSelectedNodeId(newNode.id);
-  }, [screenToFlowPosition, addNode, setSelectedNodeId]);
+    setSelectedNodeId(newNodeId);
+
+    // Magnetic auto-connect: find nearest node and create edge
+    if (magneticMode) {
+      const nearest = findNearestNode(position, newNodeId);
+      if (nearest) {
+        // Determine direction: if new node is to the right of nearest, nearest→new; otherwise new→nearest
+        const nearestCenterX = nearest.position.x + ((nearest.data?.width as number) || 100) / 2;
+        const isToRight = position.x > nearestCenterX;
+        
+        const edgeId = `e${isToRight ? nearest.id : newNodeId}-${isToRight ? newNodeId : nearest.id}-${Date.now()}`;
+        const newEdge: Edge = {
+          id: edgeId,
+          source: isToRight ? nearest.id : newNodeId,
+          target: isToRight ? newNodeId : nearest.id,
+          type: 'custom',
+          data: { style: 'solid', splitPercent: 100 },
+        };
+        storeAddEdge(newEdge);
+
+        // Recalculate split ratios
+        setTimeout(() => {
+          const currentEdges = useFunnelStore.getState().edges;
+          const updated = recalculateSplitRatios(currentEdges, newEdge.source);
+          setStoreEdges(updated);
+        }, 50);
+      }
+    }
+  }, [screenToFlowPosition, addNode, setSelectedNodeId, magneticMode, findNearestNode, storeAddEdge, setStoreEdges]);
 
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
     setSelectedNodeId(node.id);
@@ -423,6 +478,25 @@ const CanvasComponent = () => {
       <AlignmentToolbar />
       <ConversionFunnelPanel />
       
+      {/* Magnetic mode toggle */}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={magneticMode ? 'default' : 'outline'}
+              size="sm"
+              className="absolute top-3 right-3 z-10 gap-1.5 shadow-lg"
+              onClick={() => setMagneticMode(!magneticMode)}
+            >
+              <Magnet className="w-4 h-4" />
+              <span className="text-xs">{magneticMode ? 'Magnético' : 'Manual'}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p>{magneticMode ? 'Auto-conecta ao soltar perto de outro nó' : 'Conexões manuais apenas'}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <ReactFlow
         nodes={nodes}
         edges={edgesWithType}
