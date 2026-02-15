@@ -232,22 +232,15 @@ export const AddNodeHandle = ({ nodeId, position, currentNodeType }: AddNodeHand
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <div className={`absolute ${position === Position.Right ? '-right-3' : '-left-3'} top-1/2 -translate-y-1/2 z-10`}>
-          {/* Hidden actual handle for connections */}
-          <Handle 
-            type={position === Position.Right ? 'source' : 'target'}
-            position={position}
-            className="!opacity-0 !w-6 !h-6"
-          />
-          
-          {/* Visual plus button */}
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
+          {/* Visual plus button - positioned on top of node */}
           <button
             className={`
-              w-6 h-6 rounded-full bg-card border-2 border-muted-foreground/30
+              w-7 h-7 rounded-full bg-card border-2 border-muted-foreground/30
               flex items-center justify-center cursor-pointer
               hover:border-primary hover:bg-primary hover:text-primary-foreground
-              transition-all duration-200 hover:scale-110
-              shadow-sm hover:shadow-md
+              transition-all duration-200 hover:scale-125
+              shadow-md hover:shadow-lg
               group
             `}
             onClick={(e) => {
@@ -255,14 +248,14 @@ export const AddNodeHandle = ({ nodeId, position, currentNodeType }: AddNodeHand
               setIsOpen(true);
             }}
           >
-            <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary-foreground transition-colors" />
+            <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary-foreground transition-colors" />
           </button>
         </div>
       </PopoverTrigger>
       
       <PopoverContent 
-        side={position === Position.Right ? 'right' : 'left'} 
-        align="start"
+        side="top" 
+        align="center"
         className="w-64 p-0 bg-card border-border shadow-xl rounded-xl overflow-hidden z-[100]"
         sideOffset={8}
         onWheel={(e) => e.stopPropagation()}

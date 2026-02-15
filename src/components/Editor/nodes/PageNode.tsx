@@ -21,9 +21,9 @@ export const PageNode = ({ id, data, selected }: PageNodeProps) => {
   const height = data.height || 140;
 
   const handleClass = `
-    !w-3 !h-3 !rounded-full !border-2 
+    !w-4 !h-4 !rounded-full !border-2 
     !bg-card !border-muted-foreground/40
-    hover:!bg-primary hover:!border-primary hover:!scale-125
+    hover:!bg-primary hover:!border-primary hover:!scale-150
     !transition-all !duration-200
     ${selected ? '!opacity-100' : '!opacity-0 group-hover:!opacity-100'}
   `;

@@ -1,13 +1,47 @@
 import { Edge } from '@xyflow/react';
 
 /**
+ * Check if a source node's outgoing edges are in simultaneous mode.
+ */
+export const isSimultaneousDistribution = (edges: Edge[], sourceNodeId: string): boolean => {
+  const outgoing = edges.filter(e => e.source === sourceNodeId);
+  return outgoing.some(e => e.data?.simultaneousDistribution === true);
+};
+
+/**
+ * Toggle simultaneous distribution for all outgoing edges of a source node.
+ */
+export const toggleSimultaneousDistribution = (
+  edges: Edge[],
+  sourceNodeId: string,
+  enabled: boolean
+): Edge[] => {
+  return edges.map(e => {
+    if (e.source === sourceNodeId) {
+      return { ...e, data: { ...e.data, simultaneousDistribution: enabled, splitPercent: 100 } };
+    }
+    return e;
+  });
+};
+
+/**
  * Recalculate split percentages for all outgoing edges of a node.
  * Distributes evenly when no valid ratios exist.
+ * Skips recalculation if simultaneous distribution is enabled.
  */
 export const recalculateSplitRatios = (
   edges: Edge[],
   sourceNodeId: string
 ): Edge[] => {
+  // If simultaneous mode is on, keep all at 100%
+  if (isSimultaneousDistribution(edges, sourceNodeId)) {
+    return edges.map(e => 
+      e.source === sourceNodeId 
+        ? { ...e, data: { ...e.data, splitPercent: 100 } }
+        : e
+    );
+  }
+
   const outgoing = edges.filter(e => e.source === sourceNodeId);
   if (outgoing.length <= 1) {
     return edges.map(e => 
@@ -29,7 +63,6 @@ export const recalculateSplitRatios = (
   const evenPercent = Math.floor(100 / outgoing.length);
   const remainder = 100 - evenPercent * outgoing.length;
   const outgoingIds = outgoing.map(e => e.id);
-  let idx = 0;
 
   return edges.map(e => {
     const outIdx = outgoingIds.indexOf(e.id);
