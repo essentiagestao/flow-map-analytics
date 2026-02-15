@@ -21,6 +21,7 @@ import {
 } from './nodeTypes';
 import { useFunnelStore } from '@/lib/store/funnelStore';
 import { getDefaultMetrics } from '@/lib/utils/defaultMetrics';
+import { recalculateSplitRatios } from '@/lib/utils/splitRatioUtils';
 import { Node } from '@xyflow/react';
 
 interface AddNodeHandleProps {
@@ -151,16 +152,24 @@ export const AddNodeHandle = ({ nodeId, position, currentNodeType }: AddNodeHand
 
     addNode(newNode);
     
-    // Create edge with custom type
+    // Create edge connecting source to new node (or vice versa)
     const newEdge = {
       id: `e${nodeId}-${newNode.id}-${Date.now()}`,
       source: position === Position.Right ? nodeId : newNode.id,
       target: position === Position.Right ? newNode.id : nodeId,
       type: 'custom',
-      data: { style: 'solid' },
+      data: { style: 'solid', splitPercent: 100 },
     };
     
     addEdge(newEdge);
+    
+    // Recalculate split ratios for the source
+    setTimeout(() => {
+      const { edges: currentEdges, setEdges } = useFunnelStore.getState();
+      const updated = recalculateSplitRatios(currentEdges, newEdge.source);
+      setEdges(updated);
+    }, 50);
+    
     setIsOpen(false);
   }, [nodeId, position, addNode, addEdge, getNode]);
 

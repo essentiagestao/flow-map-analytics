@@ -17,6 +17,7 @@ interface FunnelStore {
   dirty: boolean;
   lastSaved: Date | null;
   isSaving: boolean;
+  magneticMode: boolean;
   
   // Actions
   addNode: (node: Node) => void;
@@ -42,6 +43,7 @@ interface FunnelStore {
   pushHistory: () => void;
   setLastSaved: (date: Date | null) => void;
   setIsSaving: (saving: boolean) => void;
+  setMagneticMode: (enabled: boolean) => void;
 }
 
 const STORAGE_KEY = 'funnel:current';
@@ -57,6 +59,7 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   dirty: false,
   lastSaved: null,
   isSaving: false,
+  magneticMode: true,
 
   addNode: (node) => {
     set((state) => {
@@ -356,5 +359,9 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
 
   setIsSaving: (saving) => {
     set({ isSaving: saving });
+  },
+
+  setMagneticMode: (enabled) => {
+    set({ magneticMode: enabled });
   },
 }));
