@@ -19,8 +19,6 @@ import { useSavedFunnelsStore } from '@/lib/store/savedFunnelsStore';
 
 export const EditorShell = () => {
   const { 
-    loadFromLocal, 
-    saveToLocal, 
     dirty, 
     removeNode, 
     removeNodes,
@@ -33,8 +31,6 @@ export const EditorShell = () => {
     redo,
     setNodes,
     pushHistory,
-    setLastSaved,
-    setIsSaving,
   } = useFunnelStore();
 
   const { alignNodes } = useNodeAlignment();
@@ -47,26 +43,7 @@ export const EditorShell = () => {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [savedFunnelsOpen, setSavedFunnelsOpen] = useState(false);
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    loadFromLocal();
-  }, [loadFromLocal]);
-
-  // Auto-save every 5 seconds if dirty
-  useEffect(() => {
-    if (!dirty) return;
-    
-    const interval = setInterval(() => {
-      if (dirty) {
-        setIsSaving?.(true);
-        saveToLocal();
-        setIsSaving?.(false);
-        setLastSaved?.(new Date());
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [dirty, saveToLocal, setLastSaved, setIsSaving]);
+  // Editor always starts blank - no auto-load from localStorage
 
   // Duplicate selected nodes
   const duplicateSelected = useCallback(() => {
@@ -119,14 +96,10 @@ export const EditorShell = () => {
     }
   }, [selectedNodeIds, selectedNodeId, removeNodes, removeNode]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts - Ctrl+S opens saved funnels dialog
   useHotkeys('ctrl+s, meta+s', (e) => {
     e.preventDefault();
-    setIsSaving?.(true);
-    saveToLocal();
-    setIsSaving?.(false);
-    setLastSaved?.(new Date());
-    toast.success('Funil salvo!');
+    setSavedFunnelsOpen(true);
   });
 
   useHotkeys('ctrl+z, meta+z', (e) => {
