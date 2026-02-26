@@ -1,20 +1,21 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { Loader2 } from 'lucide-react';
 
 const Index = () => {
   const navigate = useNavigate();
-  
+  const { user, loading } = useAuth();
+
   useEffect(() => {
-    // Redirect to editor
-    navigate('/editor');
-  }, [navigate]);
+    if (!loading) {
+      navigate(user ? '/editor' : '/login');
+    }
+  }, [user, loading, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Carregando Editor...</h1>
-        <p className="text-xl text-muted-foreground">Redirecionando para o Editor de Funis</p>
-      </div>
+      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
     </div>
   );
 };
