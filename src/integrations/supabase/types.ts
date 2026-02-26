@@ -14,7 +14,120 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      funnels: {
+        Row: {
+          canvas_data: Json
+          created_at: string
+          description: string | null
+          id: string
+          is_published: boolean | null
+          share_link: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          canvas_data?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_published?: boolean | null
+          share_link?: string | null
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          canvas_data?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_published?: boolean | null
+          share_link?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          plan: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          plan?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          plan?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      public_templates: {
+        Row: {
+          author_id: string
+          author_name: string | null
+          canvas_data: Json
+          category: string | null
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          is_approved: boolean | null
+          name: string
+          updated_at: string
+          usage_count: number | null
+        }
+        Insert: {
+          author_id: string
+          author_name?: string | null
+          canvas_data?: Json
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_approved?: boolean | null
+          name: string
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Update: {
+          author_id?: string
+          author_name?: string | null
+          canvas_data?: Json
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_approved?: boolean | null
+          name?: string
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
