@@ -1,8 +1,8 @@
-// Board Engine v1 - Isolated types
+// Board Engine v1 - Types (Miro-style)
 
 export interface BoardItem {
   id: string;
-  type: 'rect' | 'circle' | 'text';
+  type: 'rect' | 'circle' | 'text' | 'sticky' | 'frame' | 'line' | 'connector' | 'freedraw' | 'image';
   x: number;
   y: number;
   width?: number;
@@ -16,6 +16,8 @@ export interface BoardItem {
   rotation?: number;
   scaleX?: number;
   scaleY?: number;
+  points?: number[];
+  src?: string;
 }
 
 export interface ChunkBounds {
@@ -65,15 +67,10 @@ export type ToolMode =
   | 'pan'
   | 'rect'
   | 'circle'
-  | 'ellipse'
   | 'text'
   | 'line'
   | 'connector'
   | 'frame'
-  | 'section'
   | 'sticky'
   | 'freedraw'
-  | 'highlighter'
   | 'image';
-
-export type StudioMode = 'structure' | 'organize' | 'create';

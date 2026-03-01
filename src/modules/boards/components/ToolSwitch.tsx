@@ -1,12 +1,12 @@
 import {
   MousePointer2, Hand, Square, Circle, Type,
-  Minus, ArrowRight, Frame, LayoutGrid,
-  StickyNote, Pen, Highlighter, Image,
+  Minus, ArrowRight, Frame, StickyNote, Pen, Image,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useBoardStore } from '../store/boardStore';
-import type { ToolMode, StudioMode } from '../types';
+import type { ToolMode } from '../types';
+import { Separator } from '@/components/ui/separator';
 
 interface ToolDef {
   mode: ToolMode;
@@ -15,57 +15,55 @@ interface ToolDef {
   shortcut?: string;
 }
 
-const TOOLS_BY_STUDIO: Record<StudioMode, ToolDef[]> = {
-  structure: [
-    { mode: 'select', icon: MousePointer2, label: 'Selecionar', shortcut: 'V' },
-    { mode: 'pan', icon: Hand, label: 'Mover', shortcut: 'H' },
-    { mode: 'rect', icon: Square, label: 'Retângulo', shortcut: 'R' },
-    { mode: 'ellipse', icon: Circle, label: 'Elipse', shortcut: 'E' },
-    { mode: 'line', icon: Minus, label: 'Linha', shortcut: 'L' },
-    { mode: 'connector', icon: ArrowRight, label: 'Conector' },
-    { mode: 'text', icon: Type, label: 'Texto', shortcut: 'T' },
-    { mode: 'frame', icon: Frame, label: 'Frame', shortcut: 'F' },
-  ],
-  organize: [
-    { mode: 'select', icon: MousePointer2, label: 'Selecionar', shortcut: 'V' },
-    { mode: 'pan', icon: Hand, label: 'Mover', shortcut: 'H' },
-    { mode: 'section', icon: LayoutGrid, label: 'Seção', shortcut: 'S' },
-    { mode: 'frame', icon: Frame, label: 'Frame', shortcut: 'F' },
-  ],
-  create: [
-    { mode: 'select', icon: MousePointer2, label: 'Selecionar', shortcut: 'V' },
-    { mode: 'pan', icon: Hand, label: 'Mover', shortcut: 'H' },
-    { mode: 'sticky', icon: StickyNote, label: 'Sticky Note', shortcut: 'N' },
-    { mode: 'freedraw', icon: Pen, label: 'Desenho Livre', shortcut: 'P' },
-    { mode: 'highlighter', icon: Highlighter, label: 'Marcador' },
-    { mode: 'text', icon: Type, label: 'Texto', shortcut: 'T' },
-    { mode: 'image', icon: Image, label: 'Imagem' },
-  ],
-};
+const TOOLS: ToolDef[] = [
+  { mode: 'select', icon: MousePointer2, label: 'Select', shortcut: 'V' },
+  { mode: 'pan', icon: Hand, label: 'Hand', shortcut: 'H' },
+];
+
+const SHAPE_TOOLS: ToolDef[] = [
+  { mode: 'frame', icon: Frame, label: 'Frame', shortcut: 'F' },
+  { mode: 'rect', icon: Square, label: 'Rectangle', shortcut: 'R' },
+  { mode: 'circle', icon: Circle, label: 'Circle', shortcut: 'C' },
+];
+
+const DRAW_TOOLS: ToolDef[] = [
+  { mode: 'line', icon: Minus, label: 'Line', shortcut: 'L' },
+  { mode: 'connector', icon: ArrowRight, label: 'Connector' },
+  { mode: 'text', icon: Type, label: 'Text', shortcut: 'T' },
+  { mode: 'sticky', icon: StickyNote, label: 'Sticky', shortcut: 'N' },
+  { mode: 'freedraw', icon: Pen, label: 'Draw', shortcut: 'P' },
+  { mode: 'image', icon: Image, label: 'Upload' },
+];
+
+function ToolButton({ mode, icon: Icon, label, shortcut }: ToolDef) {
+  const { tool, setTool } = useBoardStore();
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant={tool === mode ? 'default' : 'ghost'}
+          size="icon"
+          className="h-9 w-9"
+          onClick={() => setTool(mode)}
+        >
+          <Icon className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="right">
+        {label}{shortcut ? ` (${shortcut})` : ''}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 export function ToolSwitch() {
-  const { tool, setTool, studioMode } = useBoardStore();
-  const tools = TOOLS_BY_STUDIO[studioMode];
-
   return (
-    <div className="flex items-center gap-0.5 bg-card border border-border rounded-lg p-1 shadow-sm">
-      {tools.map(({ mode, icon: Icon, label, shortcut }) => (
-        <Tooltip key={mode}>
-          <TooltipTrigger asChild>
-            <Button
-              variant={tool === mode ? 'default' : 'ghost'}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setTool(mode)}
-            >
-              <Icon className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            {label}{shortcut ? ` (${shortcut})` : ''}
-          </TooltipContent>
-        </Tooltip>
-      ))}
+    <div className="flex flex-col items-center gap-0.5 bg-card border border-border rounded-xl p-1.5 shadow-md">
+      {TOOLS.map(t => <ToolButton key={t.mode} {...t} />)}
+      <Separator className="my-1 w-6" />
+      {SHAPE_TOOLS.map(t => <ToolButton key={t.mode} {...t} />)}
+      <Separator className="my-1 w-6" />
+      {DRAW_TOOLS.map(t => <ToolButton key={t.mode} {...t} />)}
     </div>
   );
 }
