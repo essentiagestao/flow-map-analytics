@@ -60,4 +60,20 @@ export interface BoardSection {
   is_hidden: boolean;
 }
 
-export type ToolMode = 'select' | 'pan' | 'rect' | 'circle' | 'text';
+export type ToolMode =
+  | 'select'
+  | 'pan'
+  | 'rect'
+  | 'circle'
+  | 'ellipse'
+  | 'text'
+  | 'line'
+  | 'connector'
+  | 'frame'
+  | 'section'
+  | 'sticky'
+  | 'freedraw'
+  | 'highlighter'
+  | 'image';
+
+export type StudioMode = 'structure' | 'organize' | 'create';
