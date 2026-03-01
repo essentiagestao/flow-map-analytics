@@ -14,9 +14,7 @@ import {
   Keyboard,
   LayoutTemplate,
   LogOut,
-  LayoutGrid,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useFunnelStore } from '@/lib/store/funnelStore';
@@ -64,7 +62,6 @@ export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpen
   } = useFunnelStore();
   const { currentFunnelName } = useSavedFunnelsStore();
   const { user, profile, signOut } = useAuth();
-  const navigate = useNavigate();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -194,12 +191,7 @@ export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpen
 
         <div className="w-px h-6 bg-border mx-1" />
 
-        <Button variant="outline" size="sm" onClick={() => navigate('/workspace/boards')} title="Abrir Boards">
-          <LayoutGrid className="w-4 h-4" />
-          <span className="hidden lg:inline">Boards</span>
-        </Button>
-
-        <div className="w-px h-6 bg-border mx-1" />
+        {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-2 px-2">

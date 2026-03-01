@@ -1,176 +1,150 @@
 
-# Boards Engine v1 -- Modulo Isolado
+
+# Plano: Autenticacao Google, Funis no Supabase e Templates Publicos
 
 ## Resumo
 
-Criar um modulo totalmente independente (`/src/modules/boards/`) com canvas infinito baseado em react-konva, persistencia por chunks no banco de dados, e zero impacto no app existente. Apenas uma linha sera adicionada ao `App.tsx` (nova rota lazy).
+Tres grandes mudancas: (1) o editor sempre abre em branco, funis so existem quando salvos explicitamente, (2) autenticacao com Google para contas individuais, (3) persistencia no Supabase com templates publicos compartilhados.
 
 ---
 
-## 1. Banco de Dados (4 tabelas + 1 bucket)
+## 1. Editor Sempre Abre em Branco
 
-Todas as tabelas com prefixo `board_v1_` e RLS isolado.
+**Problema atual:** `EditorShell` chama `loadFromLocal()` no mount, carregando o ultimo estado do localStorage.
 
-### board_v1_boards
-| Coluna | Tipo | Notas |
-|--------|------|-------|
-| id | uuid PK | gen_random_uuid() |
-| owner_id | uuid NOT NULL | auth.uid() |
-| title | text | default 'Board sem nome' |
-| viewport | jsonb | {x, y, zoom} |
-| settings | jsonb | cores, grid, etc |
-| created_at | timestamptz | now() |
-| updated_at | timestamptz | now() |
-
-### board_v1_sections
-| Coluna | Tipo | Notas |
-|--------|------|-------|
-| id | uuid PK | |
-| board_id | uuid FK | -> board_v1_boards |
-| title | text | |
-| order_index | int | default 0 |
-| is_hidden | boolean | default false |
-
-### board_v1_chunks
-| Coluna | Tipo | Notas |
-|--------|------|-------|
-| id | uuid PK | |
-| board_id | uuid FK | -> board_v1_boards |
-| section_id | uuid nullable | |
-| chunk_key | text | ex: "3_-2" (grid coord) |
-| bounds | jsonb | {x, y, w, h} |
-| items | jsonb | array de shapes |
-| version | int | default 1 |
-| updated_at | timestamptz | now() |
-| UNIQUE(board_id, chunk_key) | | |
-
-### board_v1_assets
-| Coluna | Tipo | Notas |
-|--------|------|-------|
-| id | uuid PK | |
-| board_id | uuid FK | |
-| owner_id | uuid | auth.uid() |
-| type | text | 'image', 'pdf', etc |
-| storage_path | text | |
-| meta | jsonb | |
-| created_at | timestamptz | now() |
-
-### Storage bucket
-- Nome: `board-v1-assets` (public: false)
-
-### RLS (todas as tabelas)
-- SELECT/INSERT/UPDATE/DELETE: `auth.uid() = owner_id` (boards, assets)
-- sections/chunks: acesso via subquery `board_id IN (SELECT id FROM board_v1_boards WHERE owner_id = auth.uid())`
-- Usa funcao `security definer` para evitar recursao
+**Solucao:**
+- Remover a chamada `loadFromLocal()` do `useEffect` no `EditorShell.tsx`
+- Remover o auto-save para localStorage (intervalo de 5s)
+- O canvas sempre inicia vazio; o usuario carrega um funil salvo ou cria um novo
+- Manter `saveToLocal` apenas como backup temporario durante a sessao (opcional) ou remover completamente
 
 ---
 
-## 2. Estrutura de Arquivos
+## 2. Autenticacao com Google
 
-```text
-src/modules/boards/
-  store/
-    boardStore.ts          -- Zustand isolado (board atual, viewport)
-    chunkCache.ts          -- LRU cache em memoria (max 60 chunks)
-  hooks/
-    useBoardChunks.ts      -- Carrega/salva chunks por viewport
-    useBoardList.ts        -- CRUD de boards via Supabase
-    useBoardAuth.ts        -- Reutiliza useAuth existente (somente leitura)
-  engine/
-    ChunkManager.ts        -- Logica de grid: worldToChunk, visibleChunks
-    ItemSerializer.ts      -- Converte Konva shapes <-> JSON
-  components/
-    BoardsListPage.tsx     -- Lista de boards do usuario
-    BoardEditorPage.tsx    -- Layout do editor
-    CanvasStage.tsx        -- react-konva Stage com zoom/pan infinito
-    ToolSwitch.tsx         -- Toolbar: select, rect, circle, text, pan
-    SectionsSidebar.tsx    -- Painel lateral de secoes
-    Minimap.tsx            -- Preview miniatura do board
-    ShapeRenderer.tsx      -- Renderiza items de um chunk no canvas
-  types/
-    index.ts               -- Tipos isolados do modulo
-  index.tsx                -- Lazy export das paginas
+**O que ja existe no Supabase:**
+- Tabela `profiles` com trigger `handle_new_user` que cria perfil automaticamente no signup
+- RLS configurado em todas as tabelas
+
+**O que sera criado:**
+
+### Pagina de Login (`src/pages/Login.tsx`)
+- Botao "Entrar com Google" usando `supabase.auth.signInWithOAuth({ provider: 'google' })`
+- Design simples e limpo com branding do app
+
+### Auth Context (`src/hooks/useAuth.ts`)
+- Hook com `onAuthStateChange` + `getSession`
+- Expoe `user`, `profile`, `loading`, `signOut`
+
+### Protecao de Rotas
+- `Index.tsx` verifica autenticacao: se nao logado, redireciona para `/login`; se logado, redireciona para `/editor`
+- `App.tsx` ganha rota `/login`
+
+### Topbar com Usuario
+- Avatar e nome do usuario no canto direito da Topbar
+- Botao de logout
+
+**Requisito externo:** Configurar Google OAuth no Supabase Dashboard (Authentication > Providers > Google) com as credenciais do Google Cloud Console.
+
+---
+
+## 3. Funis Salvos no Supabase (em vez de localStorage)
+
+**Abordagem:** A tabela `funnels` ja existe. Vamos adicionar uma coluna JSONB `canvas_data` para armazenar o snapshot completo de nodes + edges do React Flow (muito mais simples do que normalizar nos nas tabelas `nodes`/`edges` separadas, que tem schema diferente do formato React Flow).
+
+### Nova Migracao
+```sql
+ALTER TABLE public.funnels ADD COLUMN IF NOT EXISTS canvas_data JSONB DEFAULT '{}';
 ```
 
+### Refatorar `savedFunnelsStore.ts`
+- Substituir localStorage por chamadas Supabase:
+  - `loadSavedFunnels`: `supabase.from('funnels').select('*').eq('user_id', userId).order('updated_at', { ascending: false })`
+  - `saveFunnel`: `supabase.from('funnels').insert({ user_id, title, canvas_data: { nodes, edges } })`
+  - `updateFunnel`: `supabase.from('funnels').update({ canvas_data, updated_at }).eq('id', id)`
+  - `renameFunnel`: `supabase.from('funnels').update({ title }).eq('id', id)`
+  - `deleteFunnel`: `supabase.from('funnels').delete().eq('id', id)`
+
+### Dialog "Meus Funis"
+- Mesma UI atual, mas carregando do Supabase
+- Indicador de loading enquanto busca
+- Acessivel de qualquer dispositivo logado na mesma conta
+
 ---
 
-## 3. Rota (unica alteracao no App.tsx)
+## 4. Templates Publicos (Biblioteca Compartilhada)
 
-Adicionar rotas lazy **acima** do catch-all:
+### Nova Tabela `public_templates`
+```sql
+CREATE TABLE public.public_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  author_id UUID NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  author_name TEXT,
+  name TEXT NOT NULL,
+  description TEXT,
+  icon TEXT DEFAULT 'FaRocket',
+  canvas_data JSONB NOT NULL DEFAULT '{}',
+  category TEXT DEFAULT 'geral',
+  usage_count INT DEFAULT 0,
+  is_approved BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
 
-```tsx
-const BoardsList = lazy(() => import('./modules/boards').then(m => ({ default: m.BoardsListPage })));
-const BoardEditor = lazy(() => import('./modules/boards').then(m => ({ default: m.BoardEditorPage })));
+ALTER TABLE public.public_templates ENABLE ROW LEVEL SECURITY;
 
-<Route path="/workspace/boards" element={<Suspense><BoardsList /></Suspense>} />
-<Route path="/workspace/boards/:id" element={<Suspense><BoardEditor /></Suspense>} />
+-- Todos podem ver templates aprovados
+CREATE POLICY "Anyone can view approved templates"
+  ON public.public_templates FOR SELECT
+  USING (is_approved = true);
+
+-- Usuarios podem criar templates
+CREATE POLICY "Users can create templates"
+  ON public.public_templates FOR INSERT
+  WITH CHECK (auth.uid() = author_id);
+
+-- Autores podem editar seus templates
+CREATE POLICY "Authors can update own templates"
+  ON public.public_templates FOR UPDATE
+  USING (auth.uid() = author_id);
 ```
 
-Nenhuma outra rota ou componente existente e alterado.
+### "Publicar como Template" no Dialog de Funis Salvos
+- Botao ao lado de cada funil salvo: "Compartilhar como template"
+- Pede nome, descricao e categoria
+- Insere na tabela `public_templates` com `is_approved = true` (inicialmente sem moderacao)
+
+### Refatorar `TemplateSelector.tsx`
+- Duas abas: **"Templates do Sistema"** (os hardcoded atuais) e **"Comunidade"** (do Supabase)
+- Busca templates publicos com `supabase.from('public_templates').select('*').eq('is_approved', true)`
+- Mostra autor, contagem de uso e data
+- Ao carregar, incrementa `usage_count`
 
 ---
 
-## 4. Engine -- Canvas Infinito
+## 5. Arquivos Impactados
 
-### Grid de Chunks
-- Tamanho do chunk: 2000x2000px no mundo
-- chunk_key = `${Math.floor(x/2000)}_${Math.floor(y/2000)}`
-- Ao fazer pan/zoom, calcula quais chunk_keys estao visiveis
-
-### Virtualizacao
-- `useBoardChunks` observa viewport do Konva Stage
-- Calcula chunks visiveis com margem de 1 chunk extra
-- Carrega do banco apenas chunks que nao estao no LRU cache
-- Remove chunks do canvas quando saem do viewport + margem
-
-### LRU Cache
-- Maximo 60 chunks em memoria
-- Quando excede, descarta o chunk menos recentemente acessado
-- Chunks modificados (dirty) sao salvos antes de descartar
-
-### Salvamento Incremental
-- Debounce de 1.5s apos ultima modificacao
-- Salva apenas chunks marcados como dirty
-- Usa UPSERT com `ON CONFLICT (board_id, chunk_key)`
-- Incrementa `version` a cada save
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/pages/Login.tsx` | **Novo** - Pagina de login com Google |
+| `src/hooks/useAuth.ts` | **Novo** - Hook de autenticacao |
+| `src/App.tsx` | Adicionar rota `/login` |
+| `src/pages/Index.tsx` | Verificar auth e redirecionar |
+| `src/pages/Editor.tsx` | Verificar auth, redirecionar se nao logado |
+| `src/components/Editor/EditorShell.tsx` | Remover `loadFromLocal`, remover auto-save localStorage |
+| `src/components/Editor/Topbar.tsx` | Adicionar avatar/logout do usuario |
+| `src/lib/store/savedFunnelsStore.ts` | Reescrever com Supabase em vez de localStorage |
+| `src/lib/store/funnelStore.ts` | Remover `loadFromLocal`/`saveToLocal` ou simplificar |
+| `src/components/Editor/SavedFunnelsDialog.tsx` | Adaptar para async Supabase + botao "publicar template" |
+| `src/components/Editor/TemplateSelector.tsx` | Adicionar aba "Comunidade" com templates do Supabase |
+| Nova migracao SQL | Adicionar `canvas_data` em funnels + criar tabela `public_templates` |
 
 ---
 
-## 5. ToolSwitch
+## Detalhes Tecnicos
 
-Modos de interacao (nao altera estrutura do board):
-- **Select**: clicar/arrastar shapes
-- **Pan**: arrastar canvas
-- **Rectangle**: desenhar retangulo
-- **Circle**: desenhar circulo
-- **Text**: clicar para adicionar texto
+- **Google OAuth**: Usa `supabase.auth.signInWithOAuth({ provider: 'google' })`. O usuario precisa configurar as credenciais no Supabase Dashboard.
+- **Session**: `onAuthStateChange` configurado ANTES de `getSession` para evitar race conditions.
+- **canvas_data JSONB**: Armazena `{ nodes: Node[], edges: Edge[] }` diretamente, preservando todo o formato React Flow sem perda de dados.
+- **RLS**: Todas as politicas ja existem para `funnels`. A nova tabela `public_templates` permite SELECT publico para templates aprovados.
 
-Toolbar posicionado no topo do editor, usando componentes UI existentes (Button, Tooltip).
-
----
-
-## 6. Dependencia Nova
-
-- `react-konva` + `konva` -- canvas 2D performatico com React bindings
-
----
-
-## 7. Sequencia de Implementacao
-
-1. Migrar banco: criar 4 tabelas + bucket + RLS + funcao security definer
-2. Criar tipos e store isolado (`boardStore.ts`, `chunkCache.ts`)
-3. Criar hooks de dados (`useBoardList`, `useBoardChunks`)
-4. Criar `ChunkManager` e `ItemSerializer`
-5. Criar componentes de UI (lista, editor, canvas, toolbar)
-6. Adicionar rotas lazy no `App.tsx`
-
----
-
-## 8. Garantias de Isolamento
-
-- Zero alteracoes em: funnelStore, savedFunnelsStore, EditorShell, Canvas, nodes, Topbar, Properties
-- Zero alteracoes em tabelas existentes (funnels, profiles, public_templates)
-- Zero alteracoes em RLS policies existentes
-- Store Zustand proprio em `/modules/boards/store/`
-- Componentes proprios em `/modules/boards/components/`
-- Unica linha tocada fora do modulo: rotas no `App.tsx`
