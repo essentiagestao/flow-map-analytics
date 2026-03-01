@@ -7,26 +7,17 @@ import { ShapeRenderer } from './ShapeRenderer';
 import type { BoardItem } from '../types';
 
 const COLORS = ['#4F46E5', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+function randomColor() { return COLORS[Math.floor(Math.random() * COLORS.length)]; }
+function generateId() { return crypto.randomUUID(); }
 
-function randomColor() {
-  return COLORS[Math.floor(Math.random() * COLORS.length)];
-}
-
-function generateId() {
-  return crypto.randomUUID();
-}
-
-interface CanvasStageProps {
-  boardId: string;
-}
+interface CanvasStageProps { boardId: string; }
 
 export function CanvasStage({ boardId }: CanvasStageProps) {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { viewport, setViewport, tool, selectedItemId, setSelectedItemId, setStageSize, stageSize } = useBoardStore();
   const { visibleChunks, addItem, updateItem, deleteItem } = useBoardChunks(boardId);
-  const isDrawing = useRef(false);
-  const drawStart = useRef<{ x: number; y: number } | null>(null);
+  const isPanning = useRef(false);
 
   // Resize observer
   useEffect(() => {
@@ -51,6 +42,14 @@ export function CanvasStage({ boardId }: CanvasStageProps) {
         case 'r': store.setTool('rect'); break;
         case 'c': store.setTool('circle'); break;
         case 't': store.setTool('text'); break;
+        case 'f': store.setTool('frame'); break;
+        case 'l': store.setTool('line'); break;
+        case 'n': store.setTool('sticky'); break;
+        case 'p': store.setTool('freedraw'); break;
+        case ' ':
+          e.preventDefault();
+          store.setTool('pan');
+          break;
         case 'delete':
         case 'backspace':
           if (store.selectedItemId) {
@@ -60,11 +59,19 @@ export function CanvasStage({ boardId }: CanvasStageProps) {
           break;
       }
     };
+    const upHandler = (e: KeyboardEvent) => {
+      if (e.key === ' ') {
+        useBoardStore.getState().setTool('select');
+      }
+    };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener('keyup', upHandler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      window.removeEventListener('keyup', upHandler);
+    };
   }, [deleteItem]);
 
-  // Collect all items from visible chunks
   const allItems: BoardItem[] = visibleChunks.flatMap(c => c.items);
 
   const getWorldPos = useCallback((stage: Konva.Stage) => {
@@ -80,18 +87,15 @@ export function CanvasStage({ boardId }: CanvasStageProps) {
     e.evt.preventDefault();
     const stage = stageRef.current;
     if (!stage) return;
-
     const oldZoom = viewport.zoom;
     const pointer = stage.getPointerPosition()!;
     const direction = e.evt.deltaY > 0 ? -1 : 1;
     const factor = 1.08;
     const newZoom = Math.min(Math.max(direction > 0 ? oldZoom * factor : oldZoom / factor, 0.1), 5);
-
     const mousePointTo = {
       x: (pointer.x - viewport.x) / oldZoom,
       y: (pointer.y - viewport.y) / oldZoom,
     };
-
     setViewport({
       zoom: newZoom,
       x: pointer.x - mousePointTo.x * newZoom,
@@ -102,47 +106,33 @@ export function CanvasStage({ boardId }: CanvasStageProps) {
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = stageRef.current;
     if (!stage) return;
-
-    if (tool === 'pan') {
-      // Pan is handled by stage draggable
-      return;
-    }
-
+    if (tool === 'pan') return;
     if (tool === 'select') {
-      // Clicking empty area deselects
-      if (e.target === stage) {
-        setSelectedItemId(null);
-      }
+      if (e.target === stage) setSelectedItemId(null);
       return;
     }
-
-    // Drawing tools
     const pos = getWorldPos(stage);
     if (!pos) return;
 
     if (tool === 'text') {
-      addItem({
-        id: generateId(),
-        type: 'text',
-        x: pos.x,
-        y: pos.y,
-        fill: '#1a1a1a',
-        text: 'Texto',
-        fontSize: 24,
-      });
+      addItem({ id: generateId(), type: 'text', x: pos.x, y: pos.y, fill: '#1a1a1a', text: 'Text', fontSize: 24 });
       return;
     }
-
+    if (tool === 'sticky') {
+      addItem({ id: generateId(), type: 'sticky', x: pos.x, y: pos.y, width: 200, height: 200, fill: '#FEF3C7', text: '', fontSize: 16 });
+      return;
+    }
     if (tool === 'rect' || tool === 'circle') {
       const item: BoardItem = {
         id: generateId(),
         type: tool === 'rect' ? 'rect' : 'circle',
-        x: pos.x,
-        y: pos.y,
-        fill: randomColor(),
+        x: pos.x, y: pos.y, fill: randomColor(),
         ...(tool === 'rect' ? { width: 120, height: 80 } : { radius: 50 }),
       };
       addItem(item);
+    }
+    if (tool === 'frame') {
+      addItem({ id: generateId(), type: 'frame', x: pos.x, y: pos.y, width: 400, height: 300, fill: 'transparent', stroke: '#94a3b8', strokeWidth: 2, text: 'Frame', fontSize: 14 });
     }
   }, [tool, getWorldPos, addItem, setSelectedItemId]);
 
