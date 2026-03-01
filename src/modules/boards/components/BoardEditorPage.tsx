@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBoardStore } from '../store/boardStore';
 import { CanvasStage } from './CanvasStage';
 import { ToolSwitch } from './ToolSwitch';
+import { StudioSwitch } from './StudioSwitch';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import type { Board } from '../types';
@@ -59,7 +60,9 @@ export function BoardEditorPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <span className="text-sm font-medium truncate">{currentBoard.title}</span>
-        <div className="flex-1" />
+        <div className="flex-1 flex justify-center">
+          <StudioSwitch />
+        </div>
         <ToolSwitch />
       </div>
 
