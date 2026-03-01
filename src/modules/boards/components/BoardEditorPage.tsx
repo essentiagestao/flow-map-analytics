@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useBoardStore } from '../store/boardStore';
+import { useBoardChunks } from '../hooks/useBoardChunks';
+import { BoardChunksProvider } from '../context/BoardChunksContext';
 import { CanvasStage } from './CanvasStage';
 import { ToolSwitch } from './ToolSwitch';
 import { StudioSwitch } from './StudioSwitch';
+import { ModeSidebar } from './ModeSidebar';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-import type { Board } from '../types';
+import type { Board, BoardItem } from '../types';
 
 export function BoardEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -52,22 +55,36 @@ export function BoardEditorPage() {
     );
   }
 
-  return (
-    <div className="h-screen flex flex-col bg-background">
-      {/* Top bar */}
-      <div className="h-12 border-b border-border flex items-center px-3 gap-3 bg-card shrink-0">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/workspace/boards')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <span className="text-sm font-medium truncate">{currentBoard.title}</span>
-        <div className="flex-1 flex justify-center">
-          <StudioSwitch />
-        </div>
-        <ToolSwitch />
-      </div>
+  return <BoardEditorInner boardId={currentBoard.id} navigate={navigate} />;
+}
 
-      {/* Canvas */}
-      <CanvasStage boardId={currentBoard.id} />
-    </div>
+function BoardEditorInner({ boardId, navigate }: { boardId: string; navigate: ReturnType<typeof useNavigate> }) {
+  const { currentBoard } = useBoardStore();
+  const { visibleChunks, addItem, updateItem, deleteItem } = useBoardChunks(boardId);
+
+  const allItems: BoardItem[] = visibleChunks.flatMap(c => c.items);
+
+  return (
+    <BoardChunksProvider value={{ allItems, addItem, updateItem, deleteItem }}>
+      <div className="h-screen flex flex-col bg-background">
+        {/* Top bar */}
+        <div className="h-12 border-b border-border flex items-center px-3 gap-3 bg-card shrink-0">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/workspace/boards')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-medium truncate">{currentBoard?.title}</span>
+          <div className="flex-1 flex justify-center">
+            <StudioSwitch />
+          </div>
+          <ToolSwitch />
+        </div>
+
+        {/* Body: sidebar + canvas */}
+        <div className="flex flex-1 overflow-hidden">
+          <ModeSidebar />
+          <CanvasStage boardId={boardId} />
+        </div>
+      </div>
+    </BoardChunksProvider>
   );
 }
