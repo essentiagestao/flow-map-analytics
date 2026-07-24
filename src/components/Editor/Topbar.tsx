@@ -28,6 +28,8 @@ import { toPng } from 'html-to-image';
 import { SaveIndicator } from './SaveIndicator';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { McpConnectionDialog } from './McpConnectionDialog';
+import { useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,7 +64,8 @@ export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpen
     isSaving,
   } = useFunnelStore();
   const { currentFunnelName } = useSavedFunnelsStore();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, isOwner } = useAuth();
+  const [mcpOpen, setMcpOpen] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
