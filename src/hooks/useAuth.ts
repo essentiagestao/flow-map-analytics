@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { lovable } from '@/integrations/lovable';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface Profile {
@@ -19,6 +18,8 @@ interface AuthState {
   loading: boolean;
 }
 
+export const OWNER_EMAIL = 'estevaopbxs@gmail.com';
+
 export const useAuth = () => {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -28,20 +29,16 @@ export const useAuth = () => {
   });
 
   useEffect(() => {
-    // Set up auth state listener BEFORE getSession
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         const user = session?.user ?? null;
-        
         if (user) {
-          // Fetch profile with setTimeout to avoid Supabase deadlock
           setTimeout(async () => {
             const { data: profile } = await supabase
               .from('profiles')
               .select('*')
               .eq('user_id', user.id)
-              .single();
-            
+              .maybeSingle();
             setState({ user, profile, session, loading: false });
           }, 0);
         } else {
@@ -50,7 +47,6 @@ export const useAuth = () => {
       }
     );
 
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       const user = session?.user ?? null;
       if (user) {
@@ -58,7 +54,7 @@ export const useAuth = () => {
           .from('profiles')
           .select('*')
           .eq('user_id', user.id)
-          .single()
+          .maybeSingle()
           .then(({ data: profile }) => {
             setState({ user, profile, session, loading: false });
           });
@@ -70,11 +66,9 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signInWithGoogle = async () => {
-    const result = await lovable.auth.signInWithOAuth('google', {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) throw result.error;
+  const signInWithEmail = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
   };
 
   const signOut = async () => {
@@ -82,9 +76,12 @@ export const useAuth = () => {
     if (error) throw error;
   };
 
+  const isOwner = state.user?.email?.toLowerCase() === OWNER_EMAIL;
+
   return {
     ...state,
-    signInWithGoogle,
+    isOwner,
+    signInWithEmail,
     signOut,
   };
 };

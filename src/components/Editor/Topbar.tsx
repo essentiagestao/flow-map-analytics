@@ -14,6 +14,7 @@ import {
   Keyboard,
   LayoutTemplate,
   LogOut,
+  Plug,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +28,8 @@ import { toPng } from 'html-to-image';
 import { SaveIndicator } from './SaveIndicator';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { McpConnectionDialog } from './McpConnectionDialog';
+import { useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,7 +64,8 @@ export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpen
     isSaving,
   } = useFunnelStore();
   const { currentFunnelName } = useSavedFunnelsStore();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, isOwner } = useAuth();
+  const [mcpOpen, setMcpOpen] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -205,6 +209,12 @@ export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpen
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {isOwner && (
+              <DropdownMenuItem onClick={() => setMcpOpen(true)} className="gap-2">
+                <Plug className="w-4 h-4" />
+                Conectar Claude (MCP)
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={handleSignOut} className="gap-2">
               <LogOut className="w-4 h-4" />
               Sair
@@ -212,6 +222,8 @@ export const Topbar = ({ onZoomIn, onZoomOut, onFitView, onOpenShortcuts, onOpen
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <McpConnectionDialog open={mcpOpen} onOpenChange={setMcpOpen} />
     </div>
   );
 };
