@@ -20,8 +20,13 @@ Deno.serve(async (req) => {
     const existing = list.users.find((u) => u.email?.toLowerCase() === OWNER_EMAIL);
 
     if (existing) {
+      // Ensure the password matches what the owner expects
+      await admin.auth.admin.updateUserById(existing.id, {
+        password: OWNER_PASSWORD,
+        email_confirm: true,
+      });
       return new Response(
-        JSON.stringify({ status: 'exists', user_id: existing.id }),
+        JSON.stringify({ status: 'updated', user_id: existing.id }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
