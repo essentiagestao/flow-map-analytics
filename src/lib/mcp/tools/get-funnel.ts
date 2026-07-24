@@ -2,6 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { defineTool, type ToolContext } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 
+declare const process: { env: Record<string, string | undefined> };
+
 const OWNER_EMAIL = "estevaopbxs@gmail.com";
 
 function supabaseForUser(ctx: ToolContext) {
