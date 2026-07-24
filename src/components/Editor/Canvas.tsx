@@ -272,7 +272,7 @@ const CanvasComponent = () => {
   }, []);
 
   // Called when node drag ENDS - sync positions to store
-  const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node, draggedNodes: Node[]) => {
+  const onNodeDragStop = useCallback((_event: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent, node: Node, draggedNodes: Node[]) => {
     // Get all dragged nodes (supports multi-select drag)
     const nodesToSync = draggedNodes.length > 0 ? draggedNodes : [node];
     
