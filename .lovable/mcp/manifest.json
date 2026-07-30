@@ -12,10 +12,38 @@
   "mcp": {
     "server": {
       "name": "flow-map-mcp",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "title": "Flow Map MCP"
     },
     "tools": [
+      {
+        "name": "list_node_types",
+        "title": "List node types",
+        "description": "List every item available in the funnel palette (traffic sources, pages, communication and events) with its id, category, label and default metrics. Use these ids as `type` when calling create_funnel or update_funnel.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "category": {
+              "type": "string",
+              "enum": [
+                "traffic",
+                "page",
+                "communication",
+                "event"
+              ],
+              "description": "Optional category filter."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
       {
         "name": "list_funnels",
         "title": "List funnels",
@@ -47,6 +75,241 @@
             "id": {
               "type": "string",
               "description": "Funnel UUID"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_funnel",
+        "title": "Create funnel",
+        "description": "Create a new conversion funnel with its nodes and connections. Use list_node_types first to pick valid node type ids.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Funnel title."
+            },
+            "description": {
+              "type": "string"
+            },
+            "nodes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "description": "Reference used by the connections (e.g. 'fb', 'lp')."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Node type id from list_node_types (e.g. 'facebook', 'landing')."
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Custom label. Defaults to the palette label."
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "visitors": {
+                    "type": "number",
+                    "description": "Traffic nodes only: number of visitors."
+                  },
+                  "conversionRate": {
+                    "type": "number",
+                    "description": "Page nodes only: conversion rate in percent."
+                  },
+                  "utilizationRate": {
+                    "type": "number",
+                    "description": "Communication/event nodes only: utilization rate in percent."
+                  },
+                  "cost": {
+                    "type": "number"
+                  },
+                  "x": {
+                    "type": "number",
+                    "description": "Canvas X position. Auto-laid out when omitted."
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Canvas Y position. Auto-laid out when omitted."
+                  }
+                },
+                "required": [
+                  "key",
+                  "type"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Funnel steps."
+            },
+            "connections": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "description": "Source node key."
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "Target node key."
+                  },
+                  "splitPercent": {
+                    "type": "number",
+                    "description": "Share of the traffic sent through this path (percent). Defaults to an even split."
+                  },
+                  "style": {
+                    "type": "string",
+                    "enum": [
+                      "solid",
+                      "dashed"
+                    ]
+                  },
+                  "label": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "to"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Connections between the node keys."
+            }
+          },
+          "required": [
+            "title",
+            "nodes"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "update_funnel",
+        "title": "Update funnel",
+        "description": "Update an existing funnel: rename it and/or replace its nodes and connections. Passing nodes rebuilds the whole canvas.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Funnel UUID."
+            },
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "nodes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "description": "Reference used by the connections (e.g. 'fb', 'lp')."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Node type id from list_node_types (e.g. 'facebook', 'landing')."
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Custom label. Defaults to the palette label."
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "visitors": {
+                    "type": "number",
+                    "description": "Traffic nodes only: number of visitors."
+                  },
+                  "conversionRate": {
+                    "type": "number",
+                    "description": "Page nodes only: conversion rate in percent."
+                  },
+                  "utilizationRate": {
+                    "type": "number",
+                    "description": "Communication/event nodes only: utilization rate in percent."
+                  },
+                  "cost": {
+                    "type": "number"
+                  },
+                  "x": {
+                    "type": "number",
+                    "description": "Canvas X position. Auto-laid out when omitted."
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Canvas Y position. Auto-laid out when omitted."
+                  }
+                },
+                "required": [
+                  "key",
+                  "type"
+                ],
+                "additionalProperties": false
+              },
+              "description": "New full set of funnel steps."
+            },
+            "connections": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "description": "Source node key."
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "Target node key."
+                  },
+                  "splitPercent": {
+                    "type": "number",
+                    "description": "Share of the traffic sent through this path (percent). Defaults to an even split."
+                  },
+                  "style": {
+                    "type": "string",
+                    "enum": [
+                      "solid",
+                      "dashed"
+                    ]
+                  },
+                  "label": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "to"
+                ],
+                "additionalProperties": false
+              }
             }
           },
           "required": [
