@@ -6,21 +6,54 @@
 import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.24.0";
 
 // src/lib/mcp/tools/list-funnels.ts
-import { createClient } from "npm:@supabase/supabase-js@^2.97.0";
 import { defineTool } from "npm:@lovable.dev/mcp-js@0.24.0";
+
+// src/lib/mcp/supabase.ts
+import { createClient } from "npm:@supabase/supabase-js@^2.97.0";
 var OWNER_EMAIL = "estevaopbxs@gmail.com";
+function runtimeEnv(name) {
+  const runtime = globalThis;
+  return runtime.Deno?.env?.get?.(name) ?? runtime.process?.env?.[name];
+}
+function configuredEnv(names) {
+  for (const name of names) {
+    const value = runtimeEnv(name)?.trim();
+    if (value) return value;
+  }
+  return void 0;
+}
+function supabaseProjectUrl() {
+  const url = configuredEnv(["SUPABASE_URL", "VITE_SUPABASE_URL"]);
+  if (!url) throw new Error("SUPABASE_URL (or VITE_SUPABASE_URL) is required");
+  return url;
+}
+function supabasePublishableKey() {
+  const key = configuredEnv([
+    "SUPABASE_PUBLISHABLE_KEY",
+    "VITE_SUPABASE_PUBLISHABLE_KEY",
+    "SUPABASE_ANON_KEY",
+    "VITE_SUPABASE_ANON_KEY"
+  ]);
+  if (!key) throw new Error("SUPABASE_PUBLISHABLE_KEY (or SUPABASE_ANON_KEY) is required");
+  return key;
+}
 function supabaseForUser(ctx) {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+  return createClient(supabaseProjectUrl(), supabasePublishableKey(), {
     global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
     auth: { persistSession: false, autoRefreshToken: false }
   });
 }
-function assertOwner(ctx) {
-  if (!ctx.isAuthenticated()) return { ok: false, msg: "Not authenticated" };
+function ownerError(ctx) {
+  if (!ctx.isAuthenticated()) return "Not authenticated";
   const email = (ctx.getUserEmail() ?? "").toLowerCase();
-  if (email !== OWNER_EMAIL) return { ok: false, msg: "Not authorized" };
-  return { ok: true };
+  if (email !== OWNER_EMAIL) return "Not authorized";
+  return null;
 }
+function errorResult(text) {
+  return { content: [{ type: "text", text }], isError: true };
+}
+
+// src/lib/mcp/tools/list-funnels.ts
 var list_funnels_default = defineTool({
   name: "list_funnels",
   title: "List funnels",
@@ -28,10 +61,10 @@ var list_funnels_default = defineTool({
   inputSchema: {},
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (_input, ctx) => {
-    const guard = assertOwner(ctx);
-    if (!guard.ok) return { content: [{ type: "text", text: guard.msg }], isError: true };
+    const denied = ownerError(ctx);
+    if (denied) return errorResult(denied);
     const { data, error } = await supabaseForUser(ctx).from("funnels").select("id,title,description,updated_at,created_at").order("updated_at", { ascending: false });
-    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    if (error) return errorResult(error.message);
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
       structuredContent: { funnels: data ?? [] }
@@ -40,16 +73,8 @@ var list_funnels_default = defineTool({
 });
 
 // src/lib/mcp/tools/get-funnel.ts
-import { createClient as createClient2 } from "npm:@supabase/supabase-js@^2.97.0";
 import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.24.0";
 import { z } from "npm:zod@^3.25.76";
-var OWNER_EMAIL2 = "estevaopbxs@gmail.com";
-function supabaseForUser2(ctx) {
-  return createClient2(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
-    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
-    auth: { persistSession: false, autoRefreshToken: false }
-  });
-}
 var get_funnel_default = defineTool2({
   name: "get_funnel",
   title: "Get funnel",
@@ -57,14 +82,598 @@ var get_funnel_default = defineTool2({
   inputSchema: { id: z.string().describe("Funnel UUID") },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ id }, ctx) => {
-    if (!ctx.isAuthenticated() || (ctx.getUserEmail() ?? "").toLowerCase() !== OWNER_EMAIL2) {
-      return { content: [{ type: "text", text: "Not authorized" }], isError: true };
-    }
-    const { data, error } = await supabaseForUser2(ctx).from("funnels").select("*").eq("id", id).maybeSingle();
-    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
-    if (!data) return { content: [{ type: "text", text: "Not found" }], isError: true };
+    const denied = ownerError(ctx);
+    if (denied) return errorResult(denied);
+    const { data, error } = await supabaseForUser(ctx).from("funnels").select("*").eq("id", id).maybeSingle();
+    if (error) return errorResult(error.message);
+    if (!data) return errorResult("Not found");
     return {
       content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      structuredContent: { funnel: data }
+    };
+  }
+});
+
+// src/lib/mcp/tools/list-node-types.ts
+import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { z as z2 } from "npm:zod@^3.25.76";
+
+// src/components/Editor/nodes/nodeTypes.ts
+var trafficNodes = [
+  {
+    id: "facebook",
+    label: "Facebook Ads",
+    category: "traffic",
+    color: "#1877F2",
+    bgColor: "#1877F2",
+    borderColor: "#1877F2",
+    icon: "FaFacebookF",
+    description: "An\xFAncios do Facebook"
+  },
+  {
+    id: "instagram",
+    label: "Instagram Ads",
+    category: "traffic",
+    color: "#E4405F",
+    bgColor: "linear-gradient(45deg, #F58529, #DD2A7B, #8134AF)",
+    borderColor: "#E4405F",
+    icon: "FaInstagram",
+    description: "An\xFAncios do Instagram"
+  },
+  {
+    id: "tiktok",
+    label: "TikTok Ads",
+    category: "traffic",
+    color: "#000000",
+    bgColor: "#000000",
+    borderColor: "#000000",
+    icon: "FaTiktok",
+    description: "An\xFAncios do TikTok"
+  },
+  {
+    id: "youtube",
+    label: "YouTube Ads",
+    category: "traffic",
+    color: "#FF0000",
+    bgColor: "#FF0000",
+    borderColor: "#FF0000",
+    icon: "FaYoutube",
+    description: "An\xFAncios do YouTube"
+  },
+  {
+    id: "linkedin",
+    label: "LinkedIn Ads",
+    category: "traffic",
+    color: "#0A66C2",
+    bgColor: "#0A66C2",
+    borderColor: "#0A66C2",
+    icon: "FaLinkedinIn",
+    description: "An\xFAncios do LinkedIn"
+  },
+  {
+    id: "google",
+    label: "Google Ads",
+    category: "traffic",
+    color: "#EA4335",
+    bgColor: "#EA4335",
+    borderColor: "#EA4335",
+    icon: "FaGoogle",
+    description: "Google Ads / Search"
+  },
+  {
+    id: "organic",
+    label: "Tr\xE1fego Org\xE2nico",
+    category: "traffic",
+    color: "#10B981",
+    bgColor: "#10B981",
+    borderColor: "#10B981",
+    icon: "FaSearch",
+    description: "SEO / Busca org\xE2nica"
+  },
+  {
+    id: "affiliate",
+    label: "Afiliados",
+    category: "traffic",
+    color: "#8B5CF6",
+    bgColor: "#8B5CF6",
+    borderColor: "#8B5CF6",
+    icon: "FaUsers",
+    description: "Marketing de afiliados"
+  }
+];
+var pageNodes = [
+  {
+    id: "landing",
+    label: "Landing Page",
+    category: "page",
+    color: "#6366F1",
+    bgColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
+    icon: "FaFileAlt",
+    description: "P\xE1gina de captura"
+  },
+  {
+    id: "sales",
+    label: "P\xE1gina de Vendas",
+    category: "page",
+    color: "#10B981",
+    bgColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
+    icon: "FaShoppingCart",
+    description: "P\xE1gina de oferta"
+  },
+  {
+    id: "webinar",
+    label: "Webinar",
+    category: "page",
+    color: "#F59E0B",
+    bgColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
+    icon: "FaVideo",
+    description: "Registro de webinar"
+  },
+  {
+    id: "checkout",
+    label: "Checkout",
+    category: "page",
+    color: "#EF4444",
+    bgColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
+    icon: "FaCreditCard",
+    description: "P\xE1gina de pagamento"
+  },
+  {
+    id: "thankyou",
+    label: "Thank You",
+    category: "page",
+    color: "#10B981",
+    bgColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
+    icon: "FaCheck",
+    description: "P\xE1gina de confirma\xE7\xE3o"
+  },
+  {
+    id: "blog",
+    label: "Blog Post",
+    category: "page",
+    color: "#8B5CF6",
+    bgColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
+    icon: "FaPenFancy",
+    description: "Artigo do blog"
+  },
+  {
+    id: "calendar",
+    label: "Calend\xE1rio",
+    category: "page",
+    color: "#3B82F6",
+    bgColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
+    icon: "FaCalendarAlt",
+    description: "Agendamento"
+  },
+  {
+    id: "survey",
+    label: "Pesquisa",
+    category: "page",
+    color: "#EC4899",
+    bgColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
+    icon: "FaClipboardList",
+    description: "Formul\xE1rio/Quiz"
+  }
+];
+var communicationNodes = [
+  {
+    id: "email",
+    label: "E-mail",
+    category: "communication",
+    color: "#3B82F6",
+    bgColor: "#3B82F6",
+    borderColor: "#3B82F6",
+    icon: "FaEnvelope",
+    description: "E-mail \xFAnico"
+  },
+  {
+    id: "sequence",
+    label: "Sequ\xEAncia",
+    category: "communication",
+    color: "#6366F1",
+    bgColor: "#6366F1",
+    borderColor: "#6366F1",
+    icon: "FaLayerGroup",
+    description: "Sequ\xEAncia de e-mails"
+  },
+  {
+    id: "sms",
+    label: "SMS",
+    category: "communication",
+    color: "#10B981",
+    bgColor: "#10B981",
+    borderColor: "#10B981",
+    icon: "FaSms",
+    description: "Mensagem SMS"
+  },
+  {
+    id: "whatsapp",
+    label: "WhatsApp",
+    category: "communication",
+    color: "#25D366",
+    bgColor: "#25D366",
+    borderColor: "#25D366",
+    icon: "FaWhatsapp",
+    description: "Mensagem WhatsApp"
+  }
+];
+var eventNodes = [
+  {
+    id: "lead",
+    label: "Lead",
+    category: "event",
+    color: "#EF4444",
+    bgColor: "#FEE2E2",
+    borderColor: "#EF4444",
+    icon: "FaUserPlus",
+    description: "Novo lead capturado"
+  },
+  {
+    id: "customer",
+    label: "Cliente",
+    category: "event",
+    color: "#10B981",
+    bgColor: "#D1FAE5",
+    borderColor: "#10B981",
+    icon: "FaDollarSign",
+    description: "Convers\xE3o em cliente"
+  },
+  {
+    id: "upsell",
+    label: "Upsell",
+    category: "event",
+    color: "#8B5CF6",
+    bgColor: "#EDE9FE",
+    borderColor: "#8B5CF6",
+    icon: "FaArrowUp",
+    description: "Venda adicional"
+  },
+  {
+    id: "lost",
+    label: "Perdido",
+    category: "event",
+    color: "#6B7280",
+    bgColor: "#F3F4F6",
+    borderColor: "#6B7280",
+    icon: "FaTimes",
+    description: "Lead/cliente perdido"
+  },
+  {
+    id: "segment",
+    label: "Segmento",
+    category: "event",
+    color: "#F59E0B",
+    bgColor: "#FEF3C7",
+    borderColor: "#F59E0B",
+    icon: "FaFilter",
+    description: "Segmenta\xE7\xE3o"
+  },
+  {
+    id: "crm",
+    label: "CRM",
+    category: "event",
+    color: "#3B82F6",
+    bgColor: "#DBEAFE",
+    borderColor: "#3B82F6",
+    icon: "FaDatabase",
+    description: "Entrada no CRM"
+  },
+  {
+    id: "comercial",
+    label: "Comercial",
+    category: "event",
+    color: "#0EA5E9",
+    bgColor: "#E0F2FE",
+    borderColor: "#0EA5E9",
+    icon: "FaPhone",
+    description: "Contato comercial"
+  },
+  {
+    id: "proposta",
+    label: "Proposta Comercial",
+    category: "event",
+    color: "#F97316",
+    bgColor: "#FFF7ED",
+    borderColor: "#F97316",
+    icon: "FaFileContract",
+    description: "Envio de proposta comercial"
+  },
+  {
+    id: "agendamento",
+    label: "Agendamento",
+    category: "event",
+    color: "#6366F1",
+    bgColor: "#EEF2FF",
+    borderColor: "#6366F1",
+    icon: "FaCalendarCheck",
+    description: "Reuni\xE3o ou visita agendada"
+  },
+  {
+    id: "visita",
+    label: "Visita Presencial",
+    category: "event",
+    color: "#14B8A6",
+    bgColor: "#CCFBF1",
+    borderColor: "#14B8A6",
+    icon: "FaMapMarkerAlt",
+    description: "Visita presencial ao cliente"
+  }
+];
+var allNodeTypes = [
+  ...trafficNodes,
+  ...pageNodes,
+  ...communicationNodes,
+  ...eventNodes
+];
+var categoryLabels = {
+  traffic: "Fontes de Tr\xE1fego",
+  page: "P\xE1ginas & Conte\xFAdo",
+  communication: "E-mail & Comunica\xE7\xE3o",
+  event: "Eventos & Convers\xF5es"
+};
+
+// src/lib/utils/defaultMetrics.ts
+var trafficDefaults = {
+  facebook: { visitors: 1e3, cost: 500 },
+  instagram: { visitors: 800, cost: 400 },
+  tiktok: { visitors: 1200, cost: 300 },
+  youtube: { visitors: 600, cost: 450 },
+  linkedin: { visitors: 400, cost: 600 },
+  google: { visitors: 500, cost: 350 },
+  organic: { visitors: 300, cost: 0 },
+  affiliate: { visitors: 200, cost: 100 }
+};
+var pageDefaults = {
+  landing: { conversionRate: 35, cost: 0 },
+  sales: { conversionRate: 15, cost: 0 },
+  webinar: { conversionRate: 45, cost: 0 },
+  checkout: { conversionRate: 65, cost: 0 },
+  thankyou: { conversionRate: 100, cost: 0 },
+  blog: { conversionRate: 25, cost: 0 },
+  calendar: { conversionRate: 40, cost: 0 },
+  survey: { conversionRate: 55, cost: 0 },
+  upsell: { conversionRate: 25, cost: 0 },
+  downsell: { conversionRate: 35, cost: 0 }
+};
+var communicationDefaults = {
+  email: { utilizationRate: 60, cost: 50 },
+  sequence: { utilizationRate: 55, cost: 100 },
+  sms: { utilizationRate: 70, cost: 150 },
+  whatsapp: { utilizationRate: 75, cost: 75 }
+};
+var eventDefaults = {
+  lead: { utilizationRate: 100, cost: 0 },
+  customer: { utilizationRate: 100, cost: 0 },
+  upsell: { utilizationRate: 30, cost: 0 },
+  lost: { utilizationRate: 100, cost: 0 },
+  segment: { utilizationRate: 60, cost: 0 },
+  crm: { utilizationRate: 90, cost: 0 },
+  comercial: { utilizationRate: 50, cost: 0 },
+  proposta: { utilizationRate: 40, cost: 0 },
+  agendamento: { utilizationRate: 60, cost: 0 },
+  visita: { utilizationRate: 70, cost: 0 }
+};
+
+// src/lib/mcp/tools/list-node-types.ts
+var defaultsByCategory = {
+  traffic: trafficDefaults,
+  page: pageDefaults,
+  communication: communicationDefaults,
+  event: eventDefaults
+};
+var list_node_types_default = defineTool3({
+  name: "list_node_types",
+  title: "List node types",
+  description: "List every item available in the funnel palette (traffic sources, pages, communication and events) with its id, category, label and default metrics. Use these ids as `type` when calling create_funnel or update_funnel.",
+  inputSchema: {
+    category: z2.enum(["traffic", "page", "communication", "event"]).optional().describe("Optional category filter.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: (input, ctx) => {
+    const denied = ownerError(ctx);
+    if (denied) return errorResult(denied);
+    const items = allNodeTypes.filter((n) => !input.category || n.category === input.category).map((n) => ({
+      type: n.id,
+      label: n.label,
+      category: n.category,
+      categoryLabel: categoryLabels[n.category],
+      description: n.description,
+      defaultMetrics: defaultsByCategory[n.category]?.[n.id] ?? {}
+    }));
+    return {
+      content: [{ type: "text", text: JSON.stringify(items, null, 2) }],
+      structuredContent: { nodeTypes: items }
+    };
+  }
+});
+
+// src/lib/mcp/tools/create-funnel.ts
+import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { z as z4 } from "npm:zod@^3.25.76";
+
+// src/lib/mcp/funnelBuilder.ts
+import { z as z3 } from "npm:zod@^3.25.76";
+var defaultsByCategory2 = {
+  traffic: trafficDefaults,
+  page: pageDefaults,
+  communication: communicationDefaults,
+  event: eventDefaults
+};
+var defaultSizes = {
+  traffic: { width: 64, height: 64 },
+  page: { width: 160, height: 140 },
+  communication: { width: 56, height: 56 },
+  event: { width: 56, height: 56 }
+};
+var nodeInputSchema = z3.object({
+  key: z3.string().describe("Reference used by the connections (e.g. 'fb', 'lp')."),
+  type: z3.string().describe("Node type id from list_node_types (e.g. 'facebook', 'landing')."),
+  label: z3.string().optional().describe("Custom label. Defaults to the palette label."),
+  url: z3.string().optional(),
+  visitors: z3.number().optional().describe("Traffic nodes only: number of visitors."),
+  conversionRate: z3.number().optional().describe("Page nodes only: conversion rate in percent."),
+  utilizationRate: z3.number().optional().describe("Communication/event nodes only: utilization rate in percent."),
+  cost: z3.number().optional(),
+  x: z3.number().optional().describe("Canvas X position. Auto-laid out when omitted."),
+  y: z3.number().optional().describe("Canvas Y position. Auto-laid out when omitted.")
+});
+var connectionInputSchema = z3.object({
+  from: z3.string().describe("Source node key."),
+  to: z3.string().describe("Target node key."),
+  splitPercent: z3.number().optional().describe("Share of the traffic sent through this path (percent). Defaults to an even split."),
+  style: z3.enum(["solid", "dashed"]).optional(),
+  label: z3.string().optional()
+});
+var CATEGORY_ORDER = ["traffic", "page", "communication", "event"];
+function buildCanvas(nodes, connections) {
+  if (nodes.length === 0) return { error: "At least one node is required." };
+  const keys = /* @__PURE__ */ new Set();
+  for (const n of nodes) {
+    if (keys.has(n.key)) return { error: `Duplicate node key: ${n.key}` };
+    keys.add(n.key);
+  }
+  for (const c of connections) {
+    if (!keys.has(c.from)) return { error: `Unknown connection source key: ${c.from}` };
+    if (!keys.has(c.to)) return { error: `Unknown connection target key: ${c.to}` };
+  }
+  const stamp = Date.now();
+  const idByKey = /* @__PURE__ */ new Map();
+  const columnCount = /* @__PURE__ */ new Map();
+  const builtNodes = [];
+  nodes.forEach((n, index) => {
+    const config = allNodeTypes.find((t) => t.id === n.type);
+    if (!config) return;
+    const category = config.category;
+    const size = defaultSizes[category];
+    const metrics = { ...defaultsByCategory2[category]?.[n.type] ?? {} };
+    if (n.visitors !== void 0) metrics.visitors = n.visitors;
+    if (n.conversionRate !== void 0) metrics.conversionRate = n.conversionRate;
+    if (n.utilizationRate !== void 0) metrics.utilizationRate = n.utilizationRate;
+    if (n.cost !== void 0) metrics.cost = n.cost;
+    const column = CATEGORY_ORDER.indexOf(category);
+    const row = columnCount.get(column) ?? 0;
+    columnCount.set(column, row + 1);
+    const id = `${n.type}-${stamp}-${index}`;
+    idByKey.set(n.key, id);
+    builtNodes.push({
+      id,
+      type: category,
+      position: {
+        x: n.x ?? 80 + column * 320,
+        y: n.y ?? 80 + row * 200
+      },
+      data: {
+        label: n.label ?? config.label,
+        nodeType: n.type,
+        url: n.url ?? "",
+        width: size.width,
+        height: size.height,
+        ...metrics
+      }
+    });
+  });
+  const unknownTypes = nodes.filter((n) => !allNodeTypes.some((t) => t.id === n.type));
+  if (unknownTypes.length > 0) {
+    return {
+      error: `Unknown node type(s): ${unknownTypes.map((n) => n.type).join(", ")}. Call list_node_types for valid ids.`
+    };
+  }
+  const outgoing = /* @__PURE__ */ new Map();
+  for (const c of connections) outgoing.set(c.from, (outgoing.get(c.from) ?? 0) + 1);
+  const builtEdges = connections.map((c, index) => ({
+    id: `e${idByKey.get(c.from)}-${idByKey.get(c.to)}-${stamp}-${index}`,
+    source: idByKey.get(c.from),
+    target: idByKey.get(c.to),
+    type: "custom",
+    data: {
+      style: c.style ?? "solid",
+      splitPercent: c.splitPercent ?? Math.round(100 / Math.max(1, outgoing.get(c.from) ?? 1)),
+      ...c.label ? { label: c.label } : {}
+    }
+  }));
+  return { canvas: { nodes: builtNodes, edges: builtEdges } };
+}
+
+// src/lib/mcp/tools/create-funnel.ts
+var create_funnel_default = defineTool4({
+  name: "create_funnel",
+  title: "Create funnel",
+  description: "Create a new conversion funnel with its nodes and connections. Use list_node_types first to pick valid node type ids.",
+  inputSchema: {
+    title: z4.string().describe("Funnel title."),
+    description: z4.string().optional(),
+    nodes: z4.array(nodeInputSchema).describe("Funnel steps."),
+    connections: z4.array(connectionInputSchema).optional().describe("Connections between the node keys.")
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  handler: async ({ title, description, nodes, connections }, ctx) => {
+    const denied = ownerError(ctx);
+    if (denied) return errorResult(denied);
+    const built = buildCanvas(nodes, connections ?? []);
+    if ("error" in built) return errorResult(built.error);
+    const { data, error } = await supabaseForUser(ctx).from("funnels").insert({
+      user_id: ctx.getUserId(),
+      title,
+      description: description ?? null,
+      canvas_data: built.canvas
+    }).select("id,title,description,created_at,updated_at").single();
+    if (error) return errorResult(error.message);
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Funil "${data.title}" criado com ${built.canvas.nodes.length} n\xF3s e ${built.canvas.edges.length} conex\xF5es (id ${data.id}).`
+        }
+      ],
+      structuredContent: { funnel: data }
+    };
+  }
+});
+
+// src/lib/mcp/tools/update-funnel.ts
+import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { z as z5 } from "npm:zod@^3.25.76";
+var update_funnel_default = defineTool5({
+  name: "update_funnel",
+  title: "Update funnel",
+  description: "Update an existing funnel: rename it and/or replace its nodes and connections. Passing nodes rebuilds the whole canvas.",
+  inputSchema: {
+    id: z5.string().describe("Funnel UUID."),
+    title: z5.string().optional(),
+    description: z5.string().optional(),
+    nodes: z5.array(nodeInputSchema).optional().describe("New full set of funnel steps."),
+    connections: z5.array(connectionInputSchema).optional()
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+  handler: async ({ id, title, description, nodes, connections }, ctx) => {
+    const denied = ownerError(ctx);
+    if (denied) return errorResult(denied);
+    const updates = { updated_at: (/* @__PURE__ */ new Date()).toISOString() };
+    if (title !== void 0) updates.title = title;
+    if (description !== void 0) updates.description = description;
+    if (nodes) {
+      const built = buildCanvas(nodes, connections ?? []);
+      if ("error" in built) return errorResult(built.error);
+      updates.canvas_data = built.canvas;
+    } else if (connections) {
+      return errorResult("Connections can only be updated together with nodes.");
+    }
+    if (Object.keys(updates).length === 1) {
+      return errorResult("Nothing to update.");
+    }
+    const { data, error } = await supabaseForUser(ctx).from("funnels").update(updates).eq("id", id).select("id,title,description,updated_at").maybeSingle();
+    if (error) return errorResult(error.message);
+    if (!data) return errorResult("Funnel not found.");
+    return {
+      content: [{ type: "text", text: `Funil "${data.title}" atualizado.` }],
       structuredContent: { funnel: data }
     };
   }
@@ -75,13 +684,13 @@ var projectRef = "nzeqkgfeixknufqyrbjf";
 var mcp_default = defineMcp({
   name: "flow-map-mcp",
   title: "Flow Map MCP",
-  version: "0.1.0",
-  instructions: "Tools for the Flow Map conversion-funnel editor. Use list_funnels to list saved funnels and get_funnel to inspect one. Access is restricted to the app owner.",
+  version: "0.2.0",
+  instructions: "Tools for the Flow Map conversion-funnel editor. Use list_node_types to discover every available palette item (traffic sources, pages, communication, events) and their ids, then create_funnel to build a funnel from nodes and connections. Use list_funnels/get_funnel to inspect existing funnels and update_funnel to change one. Access is restricted to the app owner.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"
   }),
-  tools: [list_funnels_default, get_funnel_default]
+  tools: [list_node_types_default, list_funnels_default, get_funnel_default, create_funnel_default, update_funnel_default]
 });
 
 // lovable-mcp-supabase-entry.ts
