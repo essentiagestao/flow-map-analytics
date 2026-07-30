@@ -46,11 +46,12 @@ export function supabaseForUser(ctx: ToolContext) {
   });
 }
 
-export function assertOwner(ctx: ToolContext): { ok: true } | { ok: false; msg: string } {
-  if (!ctx.isAuthenticated()) return { ok: false, msg: "Not authenticated" };
+/** Returns an error message when the caller is not the owner, otherwise null. */
+export function ownerError(ctx: ToolContext): string | null {
+  if (!ctx.isAuthenticated()) return "Not authenticated";
   const email = (ctx.getUserEmail() ?? "").toLowerCase();
-  if (email !== OWNER_EMAIL) return { ok: false, msg: "Not authorized" };
-  return { ok: true };
+  if (email !== OWNER_EMAIL) return "Not authorized";
+  return null;
 }
 
 export function errorResult(text: string) {

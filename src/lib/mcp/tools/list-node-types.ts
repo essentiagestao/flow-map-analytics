@@ -7,7 +7,7 @@ import {
   communicationDefaults,
   eventDefaults,
 } from "../../utils/defaultMetrics";
-import { assertOwner, errorResult } from "../supabase";
+import { ownerError, errorResult } from "../supabase";
 
 const defaultsByCategory: Record<string, Record<string, unknown>> = {
   traffic: trafficDefaults,
@@ -29,8 +29,8 @@ export default defineTool({
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: (input, ctx) => {
-    const guard = assertOwner(ctx);
-    if (!guard.ok) return errorResult(guard.msg);
+    const denied = ownerError(ctx);
+    if (denied) return errorResult(denied);
 
     const items = allNodeTypes
       .filter((n) => !input.category || n.category === input.category)
